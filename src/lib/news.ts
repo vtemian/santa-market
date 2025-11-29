@@ -254,6 +254,99 @@ The interview sent SANTA shares higher in extended trading.
 [Reading between the lines: "Productive discussions" often means negotiations are stuck]`,
       impact: { SANTA: 3, ELF: -1, REIN: 2 }
     },
+    {
+      type: 'investigation',
+      headline: 'ESG ALERT: Coal Holdings Faces Divestment Pressure',
+      message: `Major institutional investors are announcing plans to divest from Coal Holdings Ltd, citing environmental and ethical concerns.
+
+"Coal as a punishment is an outdated concept," declared the North Pole Pension Fund. "We're reallocating to more socially responsible investments."
+
+The divestment wave has accelerated after a viral campaign by young elves calling COAL "problematic" and "not aligned with modern values."
+
+COAL shares are tumbling on the news. Short interest has spiked 40% in two days.
+
+CEO Ebenezer Scrooge III defended the company: "Coal serves a purpose. Accountability matters."
+
+But the damage may be done. Several ETFs are removing COAL from their indices.
+
+[Sentiment shift: The contrarian play may be losing its appeal.]`,
+      impact: { COAL: -8, GIFT: 2 }
+    },
+    {
+      type: 'analysis',
+      headline: 'BEARISH TAKE: Is Santa Corp Overvalued?',
+      message: `A controversial new report from Grinch Capital Partners argues Santa Corp is significantly overvalued.
+
+Key concerns:
+- P/E ratio 40% above historical average
+- Market share erosion to digital alternatives
+- Rising labor costs eating into margins
+- Aging sleigh fleet requires massive capex
+
+"The magic premium is priced in and then some," wrote analyst Max Grinch. "We're initiating coverage with a SELL rating."
+
+Santa Corp dismissed the report as "FUD from known bears," but the stock is down 3% in early trading.
+
+Some analysts note Grinch Capital has a history of being early but eventually right.
+
+[Contrarian signal: When everyone is bullish, consider the bear case.]`,
+      impact: { SANTA: -5, REIN: -2 }
+    },
+    {
+      type: 'breaking',
+      headline: 'SHOCK: Naughty List Shrinks 20% - COAL Demand Collapses',
+      message: `In a stunning development, Santa Corp has announced the global naughty list has shrunk by 20% compared to last year.
+
+"Children are being better behaved," explained Chief Nice Officer Holly Goodchild. "Our behavioral intervention programs are working."
+
+While this is wonderful news for families, it's catastrophic for Coal Holdings Ltd. The company's entire business model depends on naughty children.
+
+COAL shares have entered freefall, down 12% and halted twice for volatility.
+
+"This is an existential threat," admitted one COAL analyst. "If the trend continues, the company may need to pivot entirely."
+
+GIFT is surging on the news as more children qualify for presents.
+
+[Structural shift: The naughty/nice ratio may be permanently changing.]`,
+      impact: { COAL: -15, GIFT: 5, SANTA: 2 }
+    },
+    {
+      type: 'rumor',
+      headline: 'TROUBLE: Reindeer Retirement Crisis Looms',
+      message: `Industry insiders are warning of a looming crisis at Reindeer Logistics Corp: the aging of the core reindeer team.
+
+Dasher, Dancer, Prancer, and Vixen are all approaching retirement age. Comet and Cupid have requested reduced schedules.
+
+"These deer have been flying for decades," noted veterinary analyst Dr. Antler McHoof. "Even magic has limits."
+
+The breeding program has struggled to produce replacements of equal caliber. Young reindeer are reportedly "not as committed" to the grueling Christmas Eve schedule.
+
+REIN shares are under pressure as succession concerns mount.
+
+[Long-term risk: The current team is irreplaceable. What happens when they retire?]`,
+      impact: { REIN: -6, SANTA: -3 }
+    },
+    {
+      type: 'earnings',
+      headline: 'MISS: ELF Workshop Earnings Disappoint',
+      message: `ELF Workshop Industries has reported Q3 earnings that missed analyst expectations.
+
+Key disappointments:
+- Revenue: $3.8B (vs $4.1B expected)
+- EPS: $1.72 (vs $1.95 expected)
+- Production efficiency: Down 8% due to "morale issues"
+
+CEO Bramble Woodsworth blamed "macro headwinds" and "temporary labor challenges," but analysts are skeptical.
+
+"This is the second miss in three quarters," noted Frosty Capital. "We're downgrading to HOLD."
+
+The elf union issued a statement: "Maybe if management listened to workers, productivity wouldn't be suffering."
+
+ELF shares are down 7% in after-hours trading.
+
+[Warning sign: Earnings misses often come in clusters.]`,
+      impact: { ELF: -7, SANTA: -2 }
+    },
   ],
 
   peak_shopping: [
@@ -346,6 +439,83 @@ Counterpoint: Holiday momentum is real, and timing the top is notoriously diffic
 
 [Not financial advice: But consider trimming winners and rebalancing]`,
       impact: { GIFT: -4, COAL: 3 }
+    },
+    {
+      type: 'breaking',
+      headline: 'CONSUMER SHOCK: Gift Spending Plummets Mid-Season',
+      message: `Alarming new data shows consumer gift spending has dropped 18% compared to the same period last year.
+
+Economic analysts point to inflation fatigue, rising interest rates, and a general "gift-giving skepticism" trend among younger demographics.
+
+"People are prioritizing experiences over things," explained consumer researcher Penny Pincher. "The traditional gift economy is under structural pressure."
+
+GIFT index components are selling off hard. Multiple retailers have issued profit warnings.
+
+The ripple effects are spreading: ELF production is being scaled back, and SANTA's logistics planning is in disarray.
+
+Some analysts see this as a temporary blip. Others worry it's a permanent shift in consumer behavior.
+
+[Macro warning: Consumer sentiment can turn quickly. Watch for contagion.]`,
+      impact: { GIFT: -8, ELF: -4, SANTA: -3 }
+    },
+    {
+      type: 'investigation',
+      headline: 'EXPOSÉ: Coal Mining Conditions Under Fire',
+      message: `A damning investigation has revealed troubling conditions at Coal Holdings Ltd's primary mining operations.
+
+Undercover footage shows:
+- Unsafe working conditions in the mines
+- Environmental violations at multiple sites
+- Questionable labor practices
+
+Regulators have announced immediate inspections. Environmental groups are calling for boycotts.
+
+"This is worse than we imagined," said investigative journalist Frost Woodward. "The coal-as-punishment industry has a dark underbelly."
+
+COAL shares have plunged on the revelations. Several board members have resigned.
+
+The company's statement - "We take these allegations seriously" - did little to reassure investors.
+
+[Reputational crisis: Some damage cannot be undone.]`,
+      impact: { COAL: -10, GIFT: 1 }
+    },
+    {
+      type: 'analysis',
+      headline: 'DOWNGRADE: Reindeer Logistics Faces Headwinds',
+      message: `Three major investment banks have simultaneously downgraded Reindeer Logistics Corp.
+
+Common concerns:
+- Fuel costs (magic carrots) up 30% YoY
+- Competition from drone delivery services
+- Aging infrastructure needs replacement
+- Regulatory pressure on flight paths
+
+"The golden age of reindeer logistics may be ending," wrote Arctic Securities analyst Frost Morgan. "We're moving to UNDERWEIGHT."
+
+REIN shares are down 6% on the triple downgrade. Volume is 3x normal as institutions rebalance.
+
+Bulls argue the moat is defensible. Bears say disruption is inevitable.
+
+[Sentiment shift: Wall Street consensus is turning negative.]`,
+      impact: { REIN: -7, SANTA: -2 }
+    },
+    {
+      type: 'rumor',
+      headline: 'WHISPER: Santa Corp CFO Selling Shares?',
+      message: `Unusual trading patterns suggest Santa Corp's CFO may be selling a significant portion of their holdings.
+
+SEC filings show several large block trades executed through obscure offshore entities that some analysts link to the executive.
+
+"When insiders sell, you pay attention," noted governance expert Crystal Clear. "This could mean nothing. Or it could mean everything."
+
+Santa Corp declined to comment on "speculation about private transactions."
+
+The stock is under pressure as traders parse the implications. Some see smoke. Others see fire.
+
+Insider selling during peak season is particularly concerning.
+
+[Red flag: Follow the smart money. Insiders know more than we do.]`,
+      impact: { SANTA: -6, REIN: -1, ELF: -1 }
     },
   ],
 
@@ -703,6 +873,83 @@ No official comment from either party. As always, treat rumors with appropriate 
 
 [If you're speculating: REIN typically trades up on M&A chatter, regardless of outcome]`,
       impact: { REIN: 4, SANTA: 1 }
+    },
+    {
+      type: 'analysis',
+      headline: 'SECULAR DECLINE: Is Christmas Losing Its Magic?',
+      message: `A provocative new study suggests belief in Santa Claus is declining globally for the first time in recorded history.
+
+Key findings:
+- Average age of Santa disbelief: Down to 6.2 years (from 8.1 a decade ago)
+- Percentage of households leaving cookies: -22%
+- "Magic sentiment index": At historic lows
+
+"The information age is accelerating skepticism," explained researcher Dr. Faith Fading. "Children have access to debunking content younger than ever."
+
+The implications for North Pole equities are severe. The entire business model depends on belief.
+
+All Christmas-related stocks are under pressure on the existential concerns.
+
+[Structural risk: What happens when no one believes anymore?]`,
+      impact: { SANTA: -8, REIN: -5, ELF: -4, GIFT: -6, COAL: -3 }
+    },
+    {
+      type: 'breaking',
+      headline: 'REGULATORY SHOCK: North Pole Faces New Compliance Rules',
+      message: `International regulators have announced sweeping new rules affecting North Pole operations.
+
+New requirements include:
+- Mandatory carbon reporting for sleigh flights
+- Enhanced labor standards for elf workers
+- Privacy compliance for naughty/nice data
+- Animal welfare certifications for reindeer
+
+Compliance costs are estimated at $2-3 billion annually.
+
+"This is regulatory overreach," complained Santa Corp's legal team. "We've operated for centuries without this interference."
+
+Regulators countered: "Times change. Magical entities aren't exempt from modern standards."
+
+All North Pole stocks are selling off on the compliance cost concerns.
+
+[Regulatory risk: The era of light-touch oversight may be ending.]`,
+      impact: { SANTA: -5, REIN: -4, ELF: -6, COAL: -3 }
+    },
+    {
+      type: 'investigation',
+      headline: 'TROUBLE: Coal Supply Chain Collapses',
+      message: `Coal Holdings Ltd is facing a supply crisis as multiple mining partners have terminated contracts.
+
+"We don't want to be associated with the punishment industry anymore," explained one former supplier. "ESG pressure from our investors made this decision for us."
+
+COAL is scrambling to secure alternative sources, but options are limited. The company may not have enough inventory to meet Christmas demand.
+
+CEO Ebenezer Scrooge III held an emergency board meeting. Rumors of restructuring are swirling.
+
+"This could be the beginning of the end for COAL," noted an industry veteran. "The world has moved on."
+
+Ironically, even naughty children may receive gifts this year due to the coal shortage.
+
+[Existential crisis: What is COAL without coal?]`,
+      impact: { COAL: -12, GIFT: 3 }
+    },
+    {
+      type: 'rumor',
+      headline: 'CONCERN: Key Elf Talent Defecting to Tech?',
+      message: `Multiple reports suggest ELF Workshop Industries is experiencing a talent drain to Silicon Valley.
+
+Top toy designers and magical engineers are reportedly being recruited by tech companies offering:
+- 3x salary increases
+- Stock options
+- Year-round employment (vs seasonal crunch)
+- Better work-life balance
+
+"The best elves are leaving," admitted one industry source. "They can make toys for Apple or Google now. Why deal with the Christmas stress?"
+
+ELF shares are under pressure on concerns about brain drain. The company has announced retention bonuses but may be too late.
+
+[Human capital risk: Skills are portable. Loyalty isn't guaranteed.]`,
+      impact: { ELF: -8, SANTA: -3 }
     },
   ],
 };
