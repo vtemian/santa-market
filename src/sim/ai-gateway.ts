@@ -77,12 +77,21 @@ export async function callModelTwoPhase(
  * Build Phase 1 prompt: Ask model to analyze the market
  */
 function buildAnalysisPrompt(agent: AgentConfig, state: TurnState): string {
-  return `
-Day ${state.day} of ${state.totalDays}
+  const holdingsText = Object.entries(state.portfolio.holdings)
+    .filter(([_, qty]) => qty > 0)
+    .map(([ticker, qty]) => `- ${ticker}: ${qty} shares @ $${state.prices[ticker as keyof typeof state.prices].toFixed(2)} = $${(qty * state.prices[ticker as keyof typeof state.prices]).toFixed(2)}`)
+    .join('\n');
 
-MARKET STATE:
-- Phase: ${state.regime.phase} (day ${state.regime.daysInPhase} in phase)
-- Volatility Multiplier: ${state.regime.volatilityMultiplier.toFixed(2)}
+  return `
+=== NORTH POLE STOCK EXCHANGE - TICK #${state.day} ===
+
+IMPORTANT: This is a LIVE CONTINUOUS MARKET. Ticks occur every 3 minutes, NOT daily.
+Multiple ticks happen per real-world hour. Plan your strategy accordingly - you can
+trade frequently, but transaction costs add up. The market follows real calendar dates
+for seasonal phases (Christmas approaches in real-time).
+
+CURRENT SEASON: ${state.regime.phase.toUpperCase().replace(/_/g, ' ')}
+- Volatility: ${state.regime.volatilityMultiplier.toFixed(2)}x normal
 
 MACRO CONDITIONS:
 - Consumer Sentiment: ${state.macro.consumerSentiment.toFixed(0)}/100
@@ -93,24 +102,24 @@ MACRO CONDITIONS:
 CURRENT PRICES:
 ${Object.entries(state.prices).map(([ticker, price]) => `- ${ticker}: $${price.toFixed(2)}`).join('\n')}
 
-PRICE HISTORY (last 7 days):
+PRICE HISTORY (last 7 ticks):
 ${formatPriceHistory(state.priceHistory)}
 
 YOUR PORTFOLIO:
 - Cash: $${state.portfolio.cash.toFixed(2)}
-${Object.entries(state.portfolio.holdings)
-  .filter(([_, qty]) => qty > 0)
-  .map(([ticker, qty]) => `- ${ticker}: ${qty} shares @ $${state.prices[ticker as keyof typeof state.prices].toFixed(2)} = $${(qty * state.prices[ticker as keyof typeof state.prices]).toFixed(2)}`)
-  .join('\n')}
+${holdingsText || '- No holdings'}
+- Total Value: $${(state.portfolio.cash + Object.entries(state.portfolio.holdings).reduce((sum, [t, q]) => sum + q * (state.prices[t as keyof typeof state.prices] || 0), 0)).toFixed(2)}
 
-EVENTS TODAY:
-${state.events.length > 0 ? state.events.map(e => `- ${e.message}`).join('\n') : '- No major events'}
+NEWS THIS TICK:
+${state.events.length > 0 ? state.events.map(e => e.message).join('\n\n') : 'No breaking news.'}
 
-CONSTRAINTS:
-- Max position size: ${(state.constraints.maxPositionPct * 100).toFixed(0)}% of portfolio value
-- Max COAL position: ${(state.constraints.maxCoalPct * 100).toFixed(0)}% of portfolio value
+TRADING RULES:
+- Max position: ${(state.constraints.maxPositionPct * 100).toFixed(0)}% of portfolio in any single stock
+- Max COAL: ${(state.constraints.maxCoalPct * 100).toFixed(0)}% (risky contrarian play)
+- Your trades affect prices! Heavy buying pushes prices up, selling pushes down.
+- You compete against other AI models. They see the same news but may interpret differently.
 
-Analyze this market situation. What are the key factors to consider? What trading opportunities or risks do you see?
+Analyze the market. Consider: news implications, price momentum, portfolio balance, and what your competitors might do.
 `.trim();
 }
 
