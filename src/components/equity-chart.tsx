@@ -19,24 +19,24 @@ interface EquityChartProps {
 }
 
 const chartConfig = {
-  'gpt-4o': {
-    label: 'GPT-4o',
+  'gpt-5': {
+    label: 'GPT-5.1',
     color: '#22c55e',
   },
-  'claude-sonnet': {
-    label: 'Claude Sonnet',
+  'claude-opus': {
+    label: 'Claude Opus 4.5',
     color: '#3b82f6',
   },
   'gemini-pro': {
-    label: 'Gemini Pro',
+    label: 'Gemini 3 Pro',
     color: '#a855f7',
   },
   'grok': {
-    label: 'Grok',
+    label: 'Grok 4',
     color: '#f59e0b',
   },
   'deepseek': {
-    label: 'Deepseek V3',
+    label: 'Deepseek V3.2',
     color: '#14b8a6',
   },
 } satisfies ChartConfig;

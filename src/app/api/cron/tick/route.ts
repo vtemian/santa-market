@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { advanceMarket, getMarketState, getAgents, updateAgentPortfolio, recordTrade, applyTradePressure } from '@/lib/market';
+import { advanceMarket, getMarketState, getAgents, updateAgentPortfolio, recordTrade, applyTradePressure, saveAgentSnapshots } from '@/lib/market';
 import { callModelTwoPhase, MODEL_IDS } from '@/sim/ai-gateway';
 
 const AGENTS_CONFIG = [
-  { id: 'gpt-4o', name: 'GPT-4o', modelId: MODEL_IDS['gpt-4o'] },
-  { id: 'claude-sonnet', name: 'Claude Sonnet', modelId: MODEL_IDS['claude-sonnet'] },
-  { id: 'gemini-pro', name: 'Gemini Pro', modelId: MODEL_IDS['gemini-pro'] },
-  { id: 'grok', name: 'Grok', modelId: MODEL_IDS['grok'] },
-  { id: 'deepseek', name: 'Deepseek V3', modelId: MODEL_IDS['deepseek'] },
+  { id: 'gpt-5', name: 'GPT-5.1', modelId: MODEL_IDS['gpt-5'] },
+  { id: 'claude-opus', name: 'Claude Opus 4.5', modelId: MODEL_IDS['claude-opus'] },
+  { id: 'gemini-pro', name: 'Gemini 3 Pro', modelId: MODEL_IDS['gemini-pro'] },
+  { id: 'grok', name: 'Grok 4', modelId: MODEL_IDS['grok'] },
+  { id: 'deepseek', name: 'Deepseek V3.2', modelId: MODEL_IDS['deepseek'] },
 ];
 
 export async function GET(request: NextRequest) {
@@ -123,6 +123,9 @@ export async function GET(request: NextRequest) {
     if (allExecutedOrders.length > 0) {
       await applyTradePressure(allExecutedOrders);
     }
+
+    // 5. Save agent snapshots for chart history
+    await saveAgentSnapshots(state.tickNumber);
 
     return NextResponse.json({
       success: true,

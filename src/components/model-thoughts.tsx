@@ -26,7 +26,7 @@ export function ModelThoughts({
     return (
       <div className="border-2 border-foreground bg-card flex items-center justify-center" style={{ height: '788px' }}>
         <p className="terminal-text text-muted-foreground">
-          Select a day to view model reasoning
+          Select a tick to view model reasoning
         </p>
       </div>
     );
@@ -63,7 +63,7 @@ export function ModelThoughts({
     <div className="border-2 border-foreground bg-card flex flex-col" style={{ height: '788px' }}>
       <div className="border-b-2 border-foreground px-4 py-2 flex items-center justify-between shrink-0">
         <span className="terminal-header">MODEL REASONING</span>
-        <span className="font-mono text-xs text-muted-foreground">DAY {selectedDay}</span>
+        <span className="font-mono text-xs text-muted-foreground">TICK {selectedDay}</span>
       </div>
       <ScrollArea className="flex-1 min-h-0">
         <div className="p-4 space-y-3">

@@ -49,6 +49,7 @@ export async function GET() {
         tick: t.tickNumber,
         prices: t.prices,
         news: t.news,
+        agentSnapshots: t.agentSnapshots,
       })),
     });
   } catch (error) {

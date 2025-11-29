@@ -36,6 +36,7 @@ interface MarketData {
     tick: number;
     prices: Record<string, number>;
     news: NewsItem | null;
+    agentSnapshots: Record<string, number> | null;
   }>;
 }
 
@@ -63,6 +64,13 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState<number>(0);
   const [ticking, setTicking] = useState(false);
+  const [selectedNews, setSelectedNews] = useState<{
+    tick: number;
+    headline: string;
+    message: string;
+    type?: string;
+    impact: Record<string, number>;
+  } | null>(null);
 
   // Manual tick trigger (for local development)
   const triggerTick = async () => {
@@ -124,10 +132,22 @@ export default function Home() {
   };
 
   // Collect recent headlines from price history
-  const getRecentHeadlines = (): Array<{ tick: number; headline: string; type?: string }> => {
+  const getRecentHeadlines = (): Array<{
+    tick: number;
+    headline: string;
+    message: string;
+    type?: string;
+    impact: Record<string, number>;
+  }> => {
     if (!marketData) return [];
 
-    const headlines: Array<{ tick: number; headline: string; type?: string }> = [];
+    const headlines: Array<{
+      tick: number;
+      headline: string;
+      message: string;
+      type?: string;
+      impact: Record<string, number>;
+    }> = [];
 
     // Get headlines from recent ticks (reversed so newest first)
     for (const tick of [...marketData.priceHistory].reverse()) {
@@ -135,7 +155,9 @@ export default function Home() {
         headlines.push({
           tick: tick.tick,
           headline: tick.news.headline,
+          message: tick.news.message,
           type: tick.news.type,
+          impact: tick.news.impact,
         });
       }
     }
@@ -147,7 +169,9 @@ export default function Home() {
         headlines.unshift({
           tick: marketData.tickNumber,
           headline: marketData.news.headline,
+          message: marketData.news.message,
           type: marketData.news.type,
+          impact: marketData.news.impact,
         });
       }
     }
@@ -173,7 +197,7 @@ export default function Home() {
 
         return {
           agentId: agent.id,
-          equity: agent.totalValue,
+          equity: tick.agentSnapshots?.[agent.id] ?? agent.totalValue,
           prompt: trade?.prompt || '',
           reasoning: trade?.reasoning || '',
           orders,
@@ -217,7 +241,7 @@ export default function Home() {
       <header className="sticky top-0 z-50 border-b-2 border-foreground bg-background">
         <div className="container flex h-14 items-center justify-between px-4">
           <div className="flex items-center gap-6">
-            <h1 className="terminal-header text-base">SANTA MARKET</h1>
+            <h1 className="terminal-header text-base">SANTA'S MARKET</h1>
             <nav className="hidden md:flex items-center gap-4">
               <span className="terminal-header text-primary">LIVE</span>
               <span className="text-muted-foreground">|</span>
@@ -278,13 +302,17 @@ export default function Home() {
               <div className="news-ticker-content">
                 {/* Duplicate headlines for seamless loop */}
                 {[...headlines, ...headlines].map((item, idx) => (
-                  <span key={idx} className="terminal-text text-sm px-8 shrink-0">
+                  <button
+                    key={idx}
+                    onClick={() => setSelectedNews(item)}
+                    className="terminal-text text-sm px-8 shrink-0 hover:text-primary cursor-pointer transition-colors"
+                  >
                     <span className="text-primary font-bold mr-2">
                       {item.type?.toUpperCase() || 'NEWS'}
                     </span>
                     {item.headline}
                     <span className="text-muted-foreground ml-4">#{item.tick}</span>
-                  </span>
+                  </button>
                 ))}
               </div>
             </div>
@@ -444,6 +472,68 @@ export default function Home() {
             <p className="terminal-text text-muted-foreground">
               The market is currently offline. Please try again later.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* News Modal */}
+      {selectedNews && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          onClick={() => setSelectedNews(null)}
+        >
+          <div
+            className="bg-background border-2 border-foreground max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b-2 border-foreground p-4">
+              <div className="flex items-center gap-3">
+                <span className="terminal-header text-xs text-primary px-2 py-1 border border-primary">
+                  {selectedNews.type?.toUpperCase() || 'NEWS'}
+                </span>
+                <span className="terminal-header text-xs text-muted-foreground">
+                  TICK #{selectedNews.tick}
+                </span>
+              </div>
+              <button
+                onClick={() => setSelectedNews(null)}
+                className="terminal-header text-sm hover:text-primary transition-colors"
+              >
+                [X] CLOSE
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 overflow-y-auto flex-1">
+              <h2 className="terminal-header text-lg mb-4">{selectedNews.headline}</h2>
+              <div className="terminal-text text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                {selectedNews.message}
+              </div>
+
+              {/* Market Impact */}
+              {Object.keys(selectedNews.impact).length > 0 && (
+                <div className="mt-6 pt-4 border-t border-border">
+                  <h3 className="terminal-header text-xs text-muted-foreground mb-3">MARKET IMPACT</h3>
+                  <div className="flex flex-wrap gap-3">
+                    {Object.entries(selectedNews.impact).map(([ticker, impact]) => (
+                      <div
+                        key={ticker}
+                        className={`px-3 py-1 border font-mono text-sm ${
+                          impact > 0
+                            ? 'border-green-600 text-green-600'
+                            : impact < 0
+                            ? 'border-red-600 text-red-600'
+                            : 'border-muted-foreground text-muted-foreground'
+                        }`}
+                      >
+                        {ticker} {impact > 0 ? '+' : ''}{impact}%
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

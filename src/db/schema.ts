@@ -18,6 +18,7 @@ export const ticks = pgTable('ticks', {
   prices: jsonb('prices').notNull().$type<Record<string, number>>(),
   news: jsonb('news').$type<{ message: string; impact: Record<string, number> } | null>(),
   season: text('season').notNull(),
+  agentSnapshots: jsonb('agent_snapshots').$type<Record<string, number>>(),
 });
 
 export const agents = pgTable('agents', {

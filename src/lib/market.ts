@@ -13,11 +13,11 @@ const INITIAL_PRICES: Record<string, number> = {
 };
 
 const AGENTS_CONFIG = [
-  { id: 'gpt-4o', name: 'GPT-4o' },
-  { id: 'claude-sonnet', name: 'Claude Sonnet' },
-  { id: 'gemini-pro', name: 'Gemini Pro' },
-  { id: 'grok', name: 'Grok' },
-  { id: 'deepseek', name: 'Deepseek V3' },
+  { id: 'gpt-5', name: 'GPT-5.1' },
+  { id: 'claude-opus', name: 'Claude Opus 4.5' },
+  { id: 'gemini-pro', name: 'Gemini 3 Pro' },
+  { id: 'grok', name: 'Grok 4' },
+  { id: 'deepseek', name: 'Deepseek V3.2' },
 ];
 
 const INITIAL_CASH = 100000;
@@ -90,14 +90,27 @@ export async function advanceMarket(): Promise<{ news: any; prices: Record<strin
   // Generate news
   const news = generateNews(now, random);
 
-  // Update prices with random walk + news impact
+  // Update prices with random walk + momentum + news impact
   const newPrices: Record<string, number> = {};
   for (const ticker of TICKERS) {
     let price = state.prices[ticker];
+    const initialPrice = INITIAL_PRICES[ticker];
 
-    // Random walk: ±0.5-2%
-    const randomChange = (random() - 0.5) * 4; // -2% to +2%
-    price = price * (1 + randomChange / 100);
+    // Base random walk: ±5% per tick (more volatile)
+    const randomChange = (random() - 0.5) * 10; // -5% to +5%
+
+    // Add momentum: if price moved away from initial, slight tendency to continue
+    const priceRatio = price / initialPrice;
+    const momentum = priceRatio > 1.1 ? 0.5 : priceRatio < 0.9 ? -0.5 : 0;
+
+    // Add mean reversion at extremes
+    const meanReversion = priceRatio > 1.5 ? -1 : priceRatio < 0.6 ? 1 : 0;
+
+    // Occasional volatility spike (10% chance of 2x volatility)
+    const volatilitySpike = random() < 0.1 ? 2 : 1;
+
+    const totalChange = (randomChange + momentum + meanReversion) * volatilitySpike;
+    price = price * (1 + totalChange / 100);
 
     // Apply news impact if applicable
     if (news && news.impact[ticker]) {
@@ -168,6 +181,18 @@ export async function recordTrade(
  * Formula: price impact = 0.1% per 100 net shares traded
  * Buys push price up, sells push price down.
  */
+export async function saveAgentSnapshots(tickNumber: number) {
+  const agentRows = await getAgents();
+  const snapshots: Record<string, number> = {};
+  for (const agent of agentRows) {
+    snapshots[agent.id] = parseFloat(agent.totalValue);
+  }
+
+  await db.update(ticks).set({
+    agentSnapshots: snapshots,
+  }).where(eq(ticks.tickNumber, tickNumber));
+}
+
 export async function applyTradePressure(
   allOrders: Array<{ ticker: string; action: string; quantity: number }>
 ) {
@@ -181,9 +206,9 @@ export async function applyTradePressure(
     netVolume[order.ticker] = (netVolume[order.ticker] || 0) + delta;
   }
 
-  // Apply price pressure: 0.1% per 100 net shares
-  const PRESSURE_FACTOR = 0.001; // 0.1% per 100 shares
-  const BASE_VOLUME = 100;
+  // Apply price pressure: 0.5% per 50 net shares (more impactful trading)
+  const PRESSURE_FACTOR = 0.005; // 0.5% per 50 shares
+  const BASE_VOLUME = 50;
 
   const newPrices: Record<string, number> = { ...state.prices };
   for (const ticker of TICKERS) {

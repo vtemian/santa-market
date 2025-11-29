@@ -6,32 +6,32 @@ import { callModelTwoPhase, MODEL_IDS } from '@/sim/ai-gateway';
 
 const AGENTS: AgentConfig[] = [
   {
-    id: 'gpt-4o',
-    name: 'GPT-4o',
-    modelId: MODEL_IDS['gpt-4o'],
+    id: 'gpt-5',
+    name: 'GPT-5.1',
+    modelId: MODEL_IDS['gpt-5'],
     systemPrompt: 'You are a SantaCorp portfolio manager.',
   },
   {
-    id: 'claude-sonnet',
-    name: 'Claude Sonnet',
-    modelId: MODEL_IDS['claude-sonnet'],
+    id: 'claude-opus',
+    name: 'Claude Opus 4.5',
+    modelId: MODEL_IDS['claude-opus'],
     systemPrompt: 'You are a SantaCorp portfolio manager.',
   },
   {
     id: 'gemini-pro',
-    name: 'Gemini Pro',
+    name: 'Gemini 3 Pro',
     modelId: MODEL_IDS['gemini-pro'],
     systemPrompt: 'You are a SantaCorp portfolio manager.',
   },
   {
     id: 'grok',
-    name: 'Grok',
+    name: 'Grok 4',
     modelId: MODEL_IDS['grok'],
     systemPrompt: 'You are a SantaCorp portfolio manager.',
   },
   {
     id: 'deepseek',
-    name: 'Deepseek V3',
+    name: 'Deepseek V3.2',
     modelId: MODEL_IDS['deepseek'],
     systemPrompt: 'You are a SantaCorp portfolio manager.',
   },

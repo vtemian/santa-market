@@ -8,12 +8,11 @@ const gateway = createGateway({
 
 // Model IDs for AI Gateway (provider/model format)
 export const MODEL_IDS = {
-  'gpt-4o': 'openai/gpt-4o',
-  'claude-sonnet': 'anthropic/claude-sonnet-4',
-  'gemini-pro': 'google/gemini-2.0-flash',
-  'grok': 'xai/grok-2',
-  'deepseek': 'deepseek/deepseek-chat',
-  // llama not available on AI Gateway
+  'gpt-5': 'openai/gpt-5.1-thinking',
+  'claude-opus': 'anthropic/claude-opus-4.5',
+  'gemini-pro': 'google/gemini-3-pro-preview',
+  'grok': 'xai/grok-4-fast-reasoning',
+  'deepseek': 'deepseek/deepseek-v3.2-exp-thinking',
 } as const;
 
 /**
@@ -25,7 +24,7 @@ export async function callModelTwoPhase(
   agent: AgentConfig,
   state: TurnState
 ): Promise<{ prompt: string; reasoning: string; orders: Order[] }> {
-  const timeout = 30000; // 30 seconds
+  const timeout = 120000; // 2 minutes for thinking models
 
   try {
     // Phase 1: Analysis call (free-form reasoning)

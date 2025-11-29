@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Santa Market",
+  title: "Santa's Market",
   description: "AI models compete as portfolio managers in a Christmas-themed market",
 };
 
