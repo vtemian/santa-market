@@ -12,7 +12,7 @@ export const MODEL_IDS = {
   'claude-opus': 'anthropic/claude-opus-4.5',
   'gemini-pro': 'google/gemini-3-pro-preview',
   'grok': 'xai/grok-4-fast-reasoning',
-  'deepseek': 'deepseek/deepseek-v3.2-exp-thinking',
+  'deepseek': 'deepseek/deepseek-v3',
 } as const;
 
 /**
@@ -205,14 +205,29 @@ function formatTradeHistory(tradeHistory?: Array<{
 }
 
 /**
- * Parse orders from model output, stripping markdown fences if present
+ * Parse orders from model output, handling various formats:
+ * - Plain JSON array
+ * - Markdown code fences
+ * - Thinking text before JSON (for reasoning models)
  */
 function parseOrders(text: string): Order[] {
   try {
-    // Strip markdown code fences
     let cleaned = text.trim();
-    if (cleaned.startsWith('```')) {
-      cleaned = cleaned.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+
+    // Strip markdown code fences
+    if (cleaned.includes('```')) {
+      const match = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (match) {
+        cleaned = match[1].trim();
+      }
+    }
+
+    // Try to find JSON array in the text (for thinking models that add reasoning before JSON)
+    if (!cleaned.startsWith('[')) {
+      const arrayMatch = cleaned.match(/\[[\s\S]*\]/);
+      if (arrayMatch) {
+        cleaned = arrayMatch[0];
+      }
     }
 
     const parsed = JSON.parse(cleaned);
