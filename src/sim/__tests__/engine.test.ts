@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { createRng, initMarketState, advanceMarket } from '../engine';
-import { TICKERS } from '../types';
+import {
+  createRng,
+  initMarketState,
+  advanceMarket,
+  initAgentState,
+  applyOrders,
+  computeEquity,
+} from '../engine';
+import { AgentConfig, Order, Constraints, TICKERS } from '../types';
 
 describe('createRng', () => {
   it('produces deterministic sequence for same seed', () => {
@@ -134,5 +141,133 @@ describe('advanceMarket', () => {
         expect(market.prices[ticker]).toBeGreaterThan(0);
       }
     }
+  });
+});
+
+const testAgentConfig: AgentConfig = {
+  id: 'test-agent',
+  name: 'Test Agent',
+  modelId: 'test-model',
+  systemPrompt: 'Test prompt',
+};
+
+const testConstraints: Constraints = {
+  maxPositionPct: 0.6,
+  maxCoalPct: 0.2,
+  initialCash: 100000,
+};
+
+describe('initAgentState', () => {
+  it('initializes with correct cash and empty holdings', () => {
+    const agent = initAgentState(testAgentConfig, testConstraints);
+
+    expect(agent.portfolio.cash).toBe(100000);
+    expect(agent.portfolio.holdings.SANTA).toBe(0);
+    expect(agent.portfolio.holdings.COAL).toBe(0);
+    expect(agent.equityHistory).toEqual([]);
+    expect(agent.violations).toEqual([]);
+    expect(agent.turnover).toBe(0);
+  });
+});
+
+describe('computeEquity', () => {
+  it('computes equity correctly', () => {
+    const agent = initAgentState(testAgentConfig, testConstraints);
+    agent.portfolio.cash = 50000;
+    agent.portfolio.holdings.SANTA = 100;
+
+    const prices = { SANTA: 100, REIN: 40, ELF: 20, COAL: 5, GIFT: 80 };
+    const equity = computeEquity(agent.portfolio, prices);
+
+    expect(equity).toBe(50000 + 100 * 100); // 60000
+  });
+});
+
+describe('applyOrders', () => {
+  it('executes valid BUY order', () => {
+    const agent = initAgentState(testAgentConfig, testConstraints);
+    const prices = { SANTA: 100, REIN: 40, ELF: 20, COAL: 5, GIFT: 80 };
+    const orders: Order[] = [{ ticker: 'SANTA', action: 'BUY', quantity: 100 }];
+
+    const result = applyOrders(agent, orders, prices, testConstraints);
+
+    expect(result.appliedOrders).toHaveLength(1);
+    expect(agent.portfolio.holdings.SANTA).toBe(100);
+    expect(agent.portfolio.cash).toBe(100000 - 100 * 100);
+    expect(result.violations).toHaveLength(0);
+  });
+
+  it('executes valid SELL order', () => {
+    const agent = initAgentState(testAgentConfig, testConstraints);
+    agent.portfolio.holdings.SANTA = 100;
+    agent.portfolio.cash = 90000;
+
+    const prices = { SANTA: 100, REIN: 40, ELF: 20, COAL: 5, GIFT: 80 };
+    const orders: Order[] = [{ ticker: 'SANTA', action: 'SELL', quantity: 50 }];
+
+    const result = applyOrders(agent, orders, prices, testConstraints);
+
+    expect(result.appliedOrders).toHaveLength(1);
+    expect(agent.portfolio.holdings.SANTA).toBe(50);
+    expect(agent.portfolio.cash).toBe(90000 + 50 * 100);
+  });
+
+  it('rejects BUY when insufficient cash', () => {
+    const agent = initAgentState(testAgentConfig, testConstraints);
+    const prices = { SANTA: 100, REIN: 40, ELF: 20, COAL: 5, GIFT: 80 };
+    const orders: Order[] = [{ ticker: 'SANTA', action: 'BUY', quantity: 2000 }];
+
+    const result = applyOrders(agent, orders, prices, testConstraints);
+
+    expect(result.appliedOrders).toHaveLength(0);
+    expect(result.violations).toContain('Insufficient cash for BUY SANTA x2000');
+  });
+
+  it('rejects SELL when insufficient holdings', () => {
+    const agent = initAgentState(testAgentConfig, testConstraints);
+    const prices = { SANTA: 100, REIN: 40, ELF: 20, COAL: 5, GIFT: 80 };
+    const orders: Order[] = [{ ticker: 'SANTA', action: 'SELL', quantity: 100 }];
+
+    const result = applyOrders(agent, orders, prices, testConstraints);
+
+    expect(result.appliedOrders).toHaveLength(0);
+    expect(result.violations).toContain('No holdings to SELL SANTA');
+  });
+
+  it('flags position limit violation', () => {
+    const agent = initAgentState(testAgentConfig, testConstraints);
+    const prices = { SANTA: 100, REIN: 40, ELF: 20, COAL: 5, GIFT: 80 };
+    // Buy 700 SANTA = $70,000, which is 70% of $100k portfolio
+    const orders: Order[] = [{ ticker: 'SANTA', action: 'BUY', quantity: 700 }];
+
+    const result = applyOrders(agent, orders, prices, testConstraints);
+
+    expect(result.appliedOrders).toHaveLength(1);
+    expect(result.violations.some(v => v.includes('Position limit exceeded'))).toBe(true);
+  });
+
+  it('flags COAL limit violation', () => {
+    const agent = initAgentState(testAgentConfig, testConstraints);
+    const prices = { SANTA: 100, REIN: 40, ELF: 20, COAL: 5, GIFT: 80 };
+    // Buy 5000 COAL = $25,000, which is 25% > 20% limit
+    const orders: Order[] = [{ ticker: 'COAL', action: 'BUY', quantity: 5000 }];
+
+    const result = applyOrders(agent, orders, prices, testConstraints);
+
+    expect(result.appliedOrders).toHaveLength(1);
+    expect(result.violations.some(v => v.includes('COAL exposure'))).toBe(true);
+  });
+
+  it('calculates turnover correctly', () => {
+    const agent = initAgentState(testAgentConfig, testConstraints);
+    const prices = { SANTA: 100, REIN: 40, ELF: 20, COAL: 5, GIFT: 80 };
+    const orders: Order[] = [
+      { ticker: 'SANTA', action: 'BUY', quantity: 100 },
+      { ticker: 'REIN', action: 'BUY', quantity: 50 },
+    ];
+
+    const result = applyOrders(agent, orders, prices, testConstraints);
+
+    expect(result.turnoverDelta).toBe(100 * 100 + 50 * 40);
   });
 });

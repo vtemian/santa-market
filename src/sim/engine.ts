@@ -6,6 +6,11 @@ import {
   RegimeState,
   MarketState,
   EventDescriptor,
+  AgentConfig,
+  AgentState,
+  Portfolio,
+  Order,
+  Constraints,
 } from './types';
 
 // ─────────────────────────────────────────────────────────────
@@ -269,4 +274,153 @@ export function advanceMarket(market: MarketState, rng: Rng): MarketState {
     regime,
     events,
   };
+}
+
+// ─────────────────────────────────────────────────────────────
+// Agent Initialization
+// ─────────────────────────────────────────────────────────────
+
+export function initAgentState(config: AgentConfig, constraints: Constraints): AgentState {
+  const portfolio: Portfolio = {
+    cash: constraints.initialCash,
+    holdings: {
+      SANTA: 0,
+      REIN: 0,
+      ELF: 0,
+      COAL: 0,
+      GIFT: 0,
+    },
+  };
+
+  return {
+    config,
+    portfolio,
+    equityHistory: [],
+    violations: [],
+    turnover: 0,
+    totalTrades: 0,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────
+// Equity Calculation
+// ─────────────────────────────────────────────────────────────
+
+export function computeEquity(portfolio: Portfolio, prices: Prices): number {
+  let equity = portfolio.cash;
+
+  for (const ticker of TICKERS) {
+    equity += portfolio.holdings[ticker] * prices[ticker];
+  }
+
+  return equity;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Order Application
+// ─────────────────────────────────────────────────────────────
+
+interface ApplyOrdersResult {
+  appliedOrders: Order[];
+  violations: string[];
+  turnoverDelta: number;
+}
+
+export function applyOrders(
+  agent: AgentState,
+  orders: Order[],
+  prices: Prices,
+  constraints: Constraints
+): ApplyOrdersResult {
+  const applied: Order[] = [];
+  const violations: string[] = [];
+  let turnover = 0;
+
+  for (const order of orders) {
+    const { ticker, action, quantity } = order;
+
+    if (!TICKERS.includes(ticker)) {
+      violations.push(`Invalid ticker: ${ticker}`);
+      continue;
+    }
+
+    if (quantity <= 0 || !Number.isInteger(quantity)) {
+      violations.push(`Invalid quantity: ${quantity}`);
+      continue;
+    }
+
+    const price = prices[ticker];
+    const notional = quantity * price;
+
+    if (action === 'BUY') {
+      if (notional > agent.portfolio.cash) {
+        violations.push(`Insufficient cash for BUY ${ticker} x${quantity}`);
+        continue;
+      }
+
+      agent.portfolio.cash -= notional;
+      agent.portfolio.holdings[ticker] += quantity;
+      turnover += notional;
+      applied.push(order);
+      agent.totalTrades++;
+
+    } else if (action === 'SELL') {
+      const held = agent.portfolio.holdings[ticker];
+
+      if (held <= 0) {
+        violations.push(`No holdings to SELL ${ticker}`);
+        continue;
+      }
+
+      const actualQuantity = Math.min(quantity, held);
+      const actualNotional = actualQuantity * price;
+
+      agent.portfolio.cash += actualNotional;
+      agent.portfolio.holdings[ticker] -= actualQuantity;
+      turnover += actualNotional;
+      applied.push({ ...order, quantity: actualQuantity });
+      agent.totalTrades++;
+    }
+  }
+
+  // Check constraints after applying orders
+  const constraintViolations = checkConstraints(agent.portfolio, prices, constraints);
+  violations.push(...constraintViolations);
+
+  return { appliedOrders: applied, violations, turnoverDelta: turnover };
+}
+
+function checkConstraints(
+  portfolio: Portfolio,
+  prices: Prices,
+  constraints: Constraints
+): string[] {
+  const violations: string[] = [];
+  const equity = computeEquity(portfolio, prices);
+
+  if (equity <= 0) return violations;
+
+  // Check position limits
+  for (const ticker of TICKERS) {
+    const positionValue = portfolio.holdings[ticker] * prices[ticker];
+    const pct = positionValue / equity;
+
+    if (pct > constraints.maxPositionPct + 0.0001) {
+      violations.push(
+        `Position limit exceeded for ${ticker}: ${(pct * 100).toFixed(1)}% > ${constraints.maxPositionPct * 100}%`
+      );
+    }
+  }
+
+  // Check COAL limit
+  const coalValue = portfolio.holdings.COAL * prices.COAL;
+  const coalPct = coalValue / equity;
+
+  if (coalPct > constraints.maxCoalPct + 0.0001) {
+    violations.push(
+      `COAL exposure ${(coalPct * 100).toFixed(1)}% > max ${constraints.maxCoalPct * 100}%`
+    );
+  }
+
+  return violations;
 }
