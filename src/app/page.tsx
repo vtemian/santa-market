@@ -6,11 +6,18 @@ import { ModelThoughts } from '@/components/model-thoughts';
 import { AgentCard } from '@/components/agent-card';
 import type { Prices, Ticker, Order } from '@/sim/types';
 
+interface NewsItem {
+  type?: string;
+  headline?: string;
+  message: string;
+  impact: Record<string, number>;
+}
+
 interface MarketData {
   tickNumber: number;
   prices: Record<string, number>;
   season: string;
-  news: { message: string; impact: Record<string, number> } | null;
+  news: NewsItem | null;
   nextTickAt: string;
   agents: Array<{
     id: string;
@@ -28,7 +35,7 @@ interface MarketData {
   priceHistory: Array<{
     tick: number;
     prices: Record<string, number>;
-    news: { message: string; impact: Record<string, number> } | null;
+    news: NewsItem | null;
   }>;
 }
 
@@ -116,6 +123,38 @@ export default function Home() {
     return ((current - previous) / previous) * 100;
   };
 
+  // Collect recent headlines from price history
+  const getRecentHeadlines = (): Array<{ tick: number; headline: string; type?: string }> => {
+    if (!marketData) return [];
+
+    const headlines: Array<{ tick: number; headline: string; type?: string }> = [];
+
+    // Get headlines from recent ticks (reversed so newest first)
+    for (const tick of [...marketData.priceHistory].reverse()) {
+      if (tick.news?.headline) {
+        headlines.push({
+          tick: tick.tick,
+          headline: tick.news.headline,
+          type: tick.news.type,
+        });
+      }
+    }
+
+    // Also add current news if not already in history
+    if (marketData.news?.headline) {
+      const alreadyIncluded = headlines.some(h => h.tick === marketData.tickNumber);
+      if (!alreadyIncluded) {
+        headlines.unshift({
+          tick: marketData.tickNumber,
+          headline: marketData.news.headline,
+          type: marketData.news.type,
+        });
+      }
+    }
+
+    return headlines.slice(0, 10); // Limit to 10 headlines
+  };
+
   // Transform market data for chart component
   const getTimelineForChart = () => {
     if (!marketData) return [];
@@ -170,6 +209,7 @@ export default function Home() {
   const timeline = getTimelineForChart();
   const scores = getScoresForChart();
   const currentSnapshot = timeline[timeline.length - 1];
+  const headlines = getRecentHeadlines();
 
   return (
     <main className="min-h-screen bg-background">
@@ -191,13 +231,15 @@ export default function Home() {
                 <span className="font-mono text-sm font-bold">{marketData.tickNumber}</span>
               </div>
             )}
-            <button
-              onClick={triggerTick}
-              disabled={ticking}
-              className="px-3 py-1 border-2 border-primary bg-primary/20 hover:bg-primary/40 disabled:opacity-50 disabled:cursor-not-allowed font-mono text-xs font-bold text-primary"
-            >
-              {ticking ? 'TICKING...' : 'TICK NOW'}
-            </button>
+{process.env.NODE_ENV === 'development' && (
+              <button
+                onClick={triggerTick}
+                disabled={ticking}
+                className="px-3 py-1 border-2 border-primary bg-primary/20 hover:bg-primary/40 disabled:opacity-50 disabled:cursor-not-allowed font-mono text-xs font-bold text-primary"
+              >
+                {ticking ? 'TICKING...' : 'TICK NOW'}
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -225,13 +267,26 @@ export default function Home() {
         </div>
       )}
 
-      {/* News Banner */}
-      {marketData?.news && (
+      {/* News Ticker */}
+      {headlines.length > 0 && (
         <div className="border-b-2 border-primary bg-primary/10">
-          <div className="container px-4 py-3">
-            <div className="flex items-start gap-3">
-              <span className="terminal-header text-xs text-primary shrink-0 mt-0.5">NEWS</span>
-              <p className="terminal-text text-sm">{marketData.news.message}</p>
+          <div className="flex items-center">
+            <div className="px-4 py-2 border-r-2 border-primary bg-primary/20 shrink-0">
+              <span className="terminal-header text-xs text-primary">NEWS</span>
+            </div>
+            <div className="news-ticker flex-1 py-2">
+              <div className="news-ticker-content">
+                {/* Duplicate headlines for seamless loop */}
+                {[...headlines, ...headlines].map((item, idx) => (
+                  <span key={idx} className="terminal-text text-sm px-8 shrink-0">
+                    <span className="text-primary font-bold mr-2">
+                      {item.type?.toUpperCase() || 'NEWS'}
+                    </span>
+                    {item.headline}
+                    <span className="text-muted-foreground ml-4">#{item.tick}</span>
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
         </div>

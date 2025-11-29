@@ -92,7 +92,7 @@ export function EquityChart({
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tickFormatter={(value) => `D${value}`}
+              tickFormatter={(value) => `T${value}`}
               style={{ fontFamily: 'monospace', fontSize: '10px' }}
             />
             <YAxis
@@ -107,7 +107,7 @@ export function EquityChart({
             <ChartTooltip
               content={
                 <ChartTooltipContent
-                  labelFormatter={(value) => `Day ${value}`}
+                  labelFormatter={(value) => `Tick ${value}`}
                   formatter={(value, name) => (
                     <div className="flex items-center justify-between gap-8 font-mono text-xs">
                       <span className="text-muted-foreground">{chartConfig[name as keyof typeof chartConfig]?.label || name}</span>

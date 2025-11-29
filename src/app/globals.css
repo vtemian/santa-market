@@ -158,4 +158,29 @@
     border: 2px solid var(--foreground);
     background-color: var(--card);
   }
+
+  /* News ticker */
+  .news-ticker {
+    display: flex;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .news-ticker-content {
+    display: flex;
+    animation: ticker 30s linear infinite;
+  }
+
+  .news-ticker-content:hover {
+    animation-play-state: paused;
+  }
+
+  @keyframes ticker {
+    0% {
+      transform: translateX(0);
+    }
+    100% {
+      transform: translateX(-50%);
+    }
+  }
 }
