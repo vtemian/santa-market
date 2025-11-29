@@ -54,6 +54,24 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState<number>(0);
+  const [ticking, setTicking] = useState(false);
+
+  // Manual tick trigger (for local development)
+  const triggerTick = async () => {
+    setTicking(true);
+    try {
+      const res = await fetch('/api/cron/tick');
+      if (!res.ok) {
+        throw new Error('Tick failed');
+      }
+      // Refresh market data after tick
+      await fetchMarketData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Tick failed');
+    } finally {
+      setTicking(false);
+    }
+  };
 
   // Fetch market data
   const fetchMarketData = async () => {
@@ -171,6 +189,13 @@ export default function Home() {
                 <span className="font-mono text-sm font-bold">{marketData.tickNumber}</span>
               </div>
             )}
+            <button
+              onClick={triggerTick}
+              disabled={ticking}
+              className="px-3 py-1 border-2 border-primary bg-primary/20 hover:bg-primary/40 disabled:opacity-50 disabled:cursor-not-allowed font-mono text-xs font-bold text-primary"
+            >
+              {ticking ? 'TICKING...' : 'TICK NOW'}
+            </button>
           </div>
         </div>
       </header>
