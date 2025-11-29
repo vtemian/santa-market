@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { advanceMarket, getMarketState, getAgents, updateAgentPortfolio, recordTrade, applyTradePressure, saveAgentSnapshots, getRecentTradesForAgent } from '@/lib/market';
+import { advanceMarket, getMarketState, getAgents, updateAgentPortfolio, recordTrade, applyTradePressure, saveAgentSnapshots, getRecentTradesForAgent, getPriceHistory } from '@/lib/market';
 import { callModelTwoPhase, MODEL_IDS } from '@/sim/ai-gateway';
 
 const AGENTS_CONFIG = [
@@ -23,8 +23,9 @@ export async function GET(request: NextRequest) {
     const state = await getMarketState();
     if (!state) throw new Error('Failed to get market state');
 
-    // 2. Get current agent portfolios
+    // 2. Get current agent portfolios and price history
     const agentRows = await getAgents();
+    const priceHistory = await getPriceHistory(7);
 
     // 3. Call all AI agents in parallel
     const allExecutedOrders: Array<{ ticker: string; action: string; quantity: number }> = [];
@@ -50,7 +51,7 @@ export async function GET(request: NextRequest) {
         totalDays: 999, // continuous
         portfolio: { cash, holdings },
         prices: state.prices,
-        priceHistory: {}, // TODO: add price history from recent ticks
+        priceHistory,
         macro: {
           // Map from DB schema (sentiment, energy, supplyChain) to TurnState schema
           consumerSentiment: (state.macro as any).sentiment,

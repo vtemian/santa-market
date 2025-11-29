@@ -48,6 +48,36 @@ export async function getRecentTradesForAgent(agentId: string, limit = 5) {
     .limit(limit);
 }
 
+export async function getPriceHistory(limit = 7): Promise<Record<string, number[]>> {
+  const recentTicks = await db.select()
+    .from(ticks)
+    .orderBy(desc(ticks.tickNumber))
+    .limit(limit);
+
+  // Reverse to get chronological order (oldest first)
+  recentTicks.reverse();
+
+  // Build price history per ticker
+  const history: Record<string, number[]> = {
+    SANTA: [],
+    REIN: [],
+    ELF: [],
+    GIFT: [],
+    COAL: [],
+  };
+
+  for (const tick of recentTicks) {
+    const prices = tick.prices as Record<string, number>;
+    for (const ticker of TICKERS) {
+      if (prices[ticker] !== undefined) {
+        history[ticker].push(prices[ticker]);
+      }
+    }
+  }
+
+  return history;
+}
+
 export async function initializeMarket() {
   const existing = await getMarketState();
   if (existing) return existing;
