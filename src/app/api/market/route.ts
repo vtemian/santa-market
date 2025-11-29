@@ -44,7 +44,7 @@ export async function GET() {
       nextTickAt: state?.nextTickAt,
       agents,
       tradesByAgent,
-      priceHistory: recentTicks.map(t => ({
+      priceHistory: [...recentTicks].reverse().map(t => ({
         tick: t.tickNumber,
         prices: t.prices,
         news: t.news,
