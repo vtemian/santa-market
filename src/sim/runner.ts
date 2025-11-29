@@ -102,6 +102,7 @@ export async function runSimulation(
         orders: appliedOrders,
         equity,
         violations,
+        portfolio: { ...agent.portfolio },
       });
     }
 

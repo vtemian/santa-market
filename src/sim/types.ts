@@ -108,6 +108,7 @@ export interface AgentDayLog {
   orders: Order[];
   equity: number;
   violations: string[];
+  portfolio: Portfolio;
 }
 
 export interface DaySnapshot {
