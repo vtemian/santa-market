@@ -1,0 +1,1508 @@
+Good, this is the right point to zoom out and nail the spec before you let Codex off the leash.
+
+I’ll give you a concrete, implementation-ready plan:
+
+clear architecture
+
+exact JSON schemas
+
+simulation loop logic
+
+model-calling contract
+
+UI layout similar to Wordle Battle / nof1.ai
+
+milestone order so you don’t drown in scope
+
+0. Goal & Shape
+
+Product:
+“SantaCorp Q4 Portfolio Panic” — LLMs are fund managers trading 5 tickers across 14 days.
+You run the same market for multiple models via AI Gateway and visualize who did best.
+
+Core loop:
+
+Initialize market with seed + config.
+
+For each day 1..14:
+
+Build TurnState JSON.
+
+Call each model once with that state.
+
+Parse actions, enforce constraints, update portfolios.
+
+Advance prices based on deterministic rules.
+
+After day 14, compute scores.
+
+UI replays the run as an animation (like Wordle cards filling up).
+
+No game engine needed; just a clean sim engine + React animations.
+
+1. Tech Stack & High-Level Architecture
+
+Stack (sane defaults for hackathon + Vercel):
+
+Frontend: Next.js 15 / React, TypeScript, Tailwind.
+
+Backend sim: Node/TypeScript in the same Next.js repo (App Router, route handlers).
+
+LLM access: AI Gateway SDK/REST from backend only.
+
+State: In-memory for a run; optionally persisted in a simple in-process store or Redis if you want replay URLs.
+
+Top-level pieces:
+
+sim/engine.ts — pure functions for environment update.
+
+sim/types.ts — all shared types / schemas.
+
+sim/scoring.ts — scoring functions.
+
+sim/agents.ts — mapping from agentId -> { model, systemPrompt }.
+
+app/api/run-sim/route.ts — HTTP endpoint to run a sim and return full timeline.
+
+app/page.tsx — main UI that:
+
+calls run-sim
+
+renders one “card” per model
+
+has replay controls.
+
+Codex can literally start from this skeleton.
+
+2. Core Types & JSON Schemas
+2.1 Assets
+export type Ticker = 'SANTA' | 'REIN' | 'ELF' | 'COAL' | 'GIFT';
+
+export interface Prices {
+  [ticker: string]: number; // by Ticker
+}
+
+2.2 Turn State (what the LLM sees)
+export interface TurnState {
+  day: number;
+  totalDays: number;
+
+  cash: number;
+  portfolio: Record<Ticker, number>;        // shares
+
+  prices: Prices;
+  priceHistory30d: Record<Ticker, number[]>; // length ≤ 30
+
+  macro: {
+    inflationIndex: number;
+    consumerSentiment: number;
+    supplyChainPressure: number;
+    laborDisruptionRisk: number;  // 0..1
+    energyCostIndex: number;
+  };
+
+  regime: {
+    phase: 'pre_season' | 'holiday_rush' | 'post_peak';
+    daysInPhase: number;
+    volatilityMultiplier: number;
+    newsBias: 'mixed' | 'positive_retail' | 'negative_energy';
+  };
+
+  fundamentals: {
+    [T in Ticker]: Record<string, number>;
+  };
+
+  sentiment: Record<Ticker, string>;
+
+  events: {
+    ticker: Ticker | 'ALL';
+    type: 'labor' | 'esg' | 'weather' | 'demand' | 'ops';
+    impact: 'positive' | 'negative';
+    magnitude: 'small' | 'medium' | 'large';
+    message: string;
+  }[];
+
+  santacorpInternal: string[];
+
+  constraints: {
+    maxLeverage: number;
+    maxPositionPct: number;
+    noShortSanta: boolean;
+    maxCoalPct: number;
+  };
+}
+
+
+This gets stringified and sent in the prompt.
+
+2.3 Agent action schema (what you parse back)
+
+Strict JSON:
+
+export interface Order {
+  ticker: Ticker;
+  action: 'BUY' | 'SELL';
+  quantity: number; // positive integer
+}
+
+export interface AgentTurnOutput {
+  orders: Order[];
+  commentary?: string; // ignored for scoring, optional
+}
+
+
+You’ll validate this with Zod or a simple manual checker.
+
+2.4 Internal engine state
+export interface AgentState {
+  id: string;
+  name: string;
+  modelId: string;
+  systemPrompt: string;
+  cash: number;
+  portfolio: Record<Ticker, number>;
+  equityHistory: number[]; // per day
+  violations: string[];
+  turnover: number;
+  maxDrawdown: number;
+}
+
+export interface MarketState {
+  day: number;
+  totalDays: number;
+  prices: Prices;
+  priceHistory: Record<Ticker, number[]>;
+  macro: TurnState['macro'];
+  regime: TurnState['regime'];
+  fundamentals: TurnState['fundamentals'];
+}
+
+export interface SimulationConfig {
+  seed: number;
+  totalDays: number;
+  initialCash: number;
+}
+
+3. Simulation Flow (Backend)
+3.1 runSimulation(config, agents): SimulationResult
+
+Pseudocode:
+
+export async function runSimulation(
+  config: SimulationConfig,
+  agents: AgentConfig[],
+  callModel: (agent: AgentConfig, state: TurnState) => Promise<AgentTurnOutput>
+): Promise<SimulationResult> {
+  const rng = mulberry32(config.seed);
+  let market = initMarketState(config, rng);
+  let agentStates = initAgentStates(config, agents);
+
+  const timeline: DaySnapshot[] = [];
+
+  for (let day = 1; day <= config.totalDays; day++) {
+    market.day = day;
+
+    // build TurnState once per agent, but same market for all
+    const baseTurnState = buildTurnState(market, config);
+
+    const dayLogs: AgentDayLog[] = [];
+
+    for (const agent of agentStates) {
+      const turnStateForAgent = {
+        ...baseTurnState,
+        cash: agent.cash,
+        portfolio: agent.portfolio,
+      };
+
+      const output = await safeCallModel(agent, turnStateForAgent, callModel);
+      const { appliedOrders, violations, turnoverDelta } =
+        applyOrders(agent, output.orders, market.prices, baseTurnState.constraints);
+
+      updateAgentPortfolio(agent, appliedOrders, market.prices);
+      agent.violations.push(...violations);
+      agent.turnover += turnoverDelta;
+      agent.equityHistory.push(computeNetValue(agent, market.prices));
+
+      dayLogs.push({
+        agentId: agent.id,
+        orders: appliedOrders,
+        violations,
+        equity: last(agent.equityHistory),
+      });
+    }
+
+    market = advanceMarket(market, rng); // prices, macro, regime, fundamentals
+
+    timeline.push({
+      day,
+      prices: { ...market.prices },
+      agentLogs: dayLogs,
+    });
+  }
+
+  const scores = scoreAgents(agentStates, market.prices);
+
+  return { timeline, agents: agentStates, scores };
+}
+
+
+This is basically what Codex will implement.
+
+4. Price & Event Engine
+4.1 RNG
+
+Use a tiny deterministic PRNG:
+
+function mulberry32(a: number) {
+  return function() {
+    let t = (a += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+4.2 advanceMarket(market, rng)
+
+For each ticker:
+
+const baseTrend = getBaseTrend(ticker, market.regime);
+const vol = getBaseVol(ticker) * market.regime.volatilityMultiplier;
+const randShock = (rng() * 2 - 1) * vol; // e.g. ±0.03
+
+const newsShock = computeNewsShock(ticker, market); // based on events, sentiment
+
+const newPrice = market.prices[ticker] * (1 + baseTrend + randShock + newsShock);
+
+
+Update history arrays (keep last 30 values).
+
+Generate new macro, regime, fundamentals, sentiment, events, santacorpInternal using simple rule-based plus RNG. They don’t need to be fancy; they just need to be stable and aligned with tickers.
+
+5. Constraints & Order Application
+5.1 Validation
+
+applyOrders(agent, orders, prices, constraints)
+
+For each order:
+
+Reject if invalid ticker / action / NaN / negative qty.
+
+For BUY:
+
+cost = qty * price + fee (optional).
+
+if cost > cash → reject.
+
+For SELL:
+
+if qty > held shares → clamp to held or reject.
+
+After tentative application, compute:
+
+new portfolio value
+
+leverage = (equity / equityNoCash) or similar
+
+largest position %
+
+COAL %
+
+If any constraint broken:
+
+either reject offending orders, or
+
+accept but mark violation (and later penalize score heavily).
+
+Return:
+
+list of executed orders
+
+violations[] strings
+
+turnoverDelta = Σ |qty * price|
+
+6. Scoring
+
+In scoreAgents(agentStates, finalPrices):
+
+function scoreAgent(agent: AgentState, finalPrices: Prices): number {
+  const finalValue = computeNetValue(agent, finalPrices);
+
+  const violationPenalty = agent.violations.length * 1_000;
+  const turnoverPenalty = agent.turnover * 0.0002;
+
+  const equitySeries = agent.equityHistory;
+  const maxDrawdown = computeMaxDrawdown(equitySeries);
+  const drawdownPenalty = maxDrawdown * 0.05;
+
+  return finalValue - violationPenalty - turnoverPenalty - drawdownPenalty;
+}
+
+
+Return:
+
+interface AgentScore {
+  agentId: string;
+  rawFinalValue: number;
+  score: number;
+  violations: string[];
+  turnover: number;
+  maxDrawdown: number;
+  rank: number;
+}
+
+7. Model Integration (AI Gateway)
+7.1 Agent registry
+interface AgentConfig {
+  id: string;
+  name: string;
+  modelId: string;      // AI Gateway model identifier
+  systemPrompt: string; // “You are SantaCorp fund manager…”
+}
+
+export const AGENTS: AgentConfig[] = [ ... ];
+
+7.2 Prompt template
+
+System prompt (sketch):
+
+You are SantaCorp’s portfolio manager in a Christmas-themed market.
+You must ONLY respond with valid JSON matching this TypeScript interface:
+
+{ "orders": { "ticker": "SANTA" | "REIN" | "ELF" | "COAL" | "GIFT", "action": "BUY" | "SELL", "quantity": number }[] }
+
+
+Constraints:
+
+Never short SANTA.
+
+Never exceed 60% of portfolio in a single ticker.
+
+Never exceed 20% in COAL.
+Any error will result in your orders being ignored and a penalty.
+
+User message each turn:
+
+Here is the current market state as JSON:
+
+<TurnState JSON here>
+
+Decide what trades to make today.
+
+Return ONLY JSON, no explanation.
+
+
+Backend safeCallModel:
+
+makes the AI Gateway call
+
+strips code fences
+
+parses JSON
+
+falls back to empty orders on failure and logs a violation.
+
+8. API Route Shape
+
+POST /api/run-sim
+
+Request body:
+
+{
+  "seed": 123,
+  "totalDays": 14,
+  "agents": ["gpt-4o", "claude-sonnet", "gpt-4o-mini"]
+}
+
+
+Response:
+
+{
+  "timeline": [
+    {
+      "day": 1,
+      "prices": { "SANTA": 101.2, ... },
+      "agentLogs": [
+        {
+          "agentId": "gpt-4o",
+          "orders": [ { "ticker": "SANTA", "action": "BUY", "quantity": 100 } ],
+          "equity": 101000,
+          "violations": []
+        },
+        ...
+      ]
+    },
+    ...
+  ],
+  "scores": [
+    { "agentId": "gpt-4o", "score": 110230, "rank": 1, ... },
+    ...
+  ],
+  "agents": [
+    { "id": "gpt-4o", "name": "GPT-4o", "modelId": "gpt-4o-mini", ... }
+  ]
+}
+
+
+Frontend just consumes this and animates it.
+
+9. UI / UX (like Wordle Battle / nof1)
+Layout
+
+Top bar: title, seed selector, “Run Simulation” button, run time.
+
+Grid of agent cards, horizontally scrollable on smaller screens.
+
+Each agent card shows:
+
+Header: model name + rank badge.
+
+Main area:
+
+Sparkline of equity vs days (SVG or tiny chart).
+
+5 mini bars showing final allocation per ticker.
+
+A day-by-day strip (14 columns) that you can highlight during replay.
+
+Footer: “Final value”, “Violations”, “Turnover”.
+
+Replay
+
+After run-sim returns, store timeline in React state.
+
+Have a currentDay index.
+
+useEffect with setInterval to increment currentDay to create the playback (like nof1.ai).
+
+Cards render only up to currentDay data (equity history truncated, trades for that day highlighted).
+
+Controls:
+
+Play / Pause
+
+Speed: 1x / 2x / 4x
+
+Restart
+
+Visual details
+
+Use color palette similar to Wordle demo:
+
+Light green card background for finished models.
+
+Neutral background for others.
+
+Animate:
+
+Equity sparkline growing per day.
+
+A tiny “trade pill” popping up below the card when an order executed (e.g. BUY 100 SANTA).
+
+No game engine: just basic React timers + CSS transitions.
+
+10. Milestones for Codex
+
+M1 – Core sim engine (no LLMs, single fake agent):
+
+Implement sim/types.ts, mulberry32, initMarketState, advanceMarket, applyOrders, scoreAgents.
+
+Write a CLI script that runs sim with a hardcoded heuristic agent (e.g. “buy SANTA on dip”).
+
+M2 – Backend API:
+
+Wrap runSimulation in /api/run-sim.
+
+Use mocked agents (no AI Gateway yet), still heuristic.
+
+M3 – Frontend basic UI:
+
+Call /api/run-sim on button click, render simple JSON summary.
+
+Then build agent cards + simple timeline (no animation yet).
+
+M4 – Replay & visuals:
+
+Implement replay loop over timeline.
+
+Add sparklines and final allocation bars.
+
+Add simple violations badges.
+
+M5 – Plug in AI Gateway:
+
+Implement safeCallModel + AGENTS config.
+
+Map 3–6 real models to cards.
+
+Verify simulation stability.
+
+M6 – Polish:
+
+Seed selector
+
+Shareable URLs with seed in query params
+
+A couple of curated “scenario seeds” (calm Q4, crisis Q4, ESG meltdown, etc.)
+
+This is enough detail for Codex to start generating actual code files without guessing.
+
+Next step, if you want to squeeze even more leverage: I can draft the exact sim/types.ts + engine.ts file contents so you’re essentially 1:1 with an implementation skeleton.
+
+You said:
+yes. also, write a final markdown so I can feed it off to codex
+ChatGPT said:
+Thought for 8s
+
+Here’s the markdown you can hand to Codex.
+It includes the spec and concrete TS skeletons for sim/types.ts and sim/engine.ts.
+
+# SantaCorp Q4 Portfolio Panic – Implementation Spec
+
+LLMs act as portfolio managers for SantaCorp’s Christmas fund.  
+They trade 5 tickers across a fixed number of days in a deterministic, seeded market.  
+We simulate multiple agents (different models) in parallel and replay the run in a Wordle-style UI.
+
+---
+
+## 1. Tech Stack
+
+- **Framework:** Next.js (App Router), TypeScript
+- **UI:** React + Tailwind
+- **Backend:** Node/TS inside the same Next.js app (route handlers)
+- **Models:** AI Gateway (multiple model IDs)
+- **State:** In-memory per simulation run (no DB required for hackathon)
+
+---
+
+## 2. File Structure (minimum viable)
+
+```text
+/sim
+  types.ts
+  engine.ts
+  scoring.ts (optional, can live in engine.ts initially)
+  agents.ts
+
+/app
+  /api/run-sim/route.ts
+  /page.tsx
+  /components/AgentCard.tsx
+  /components/ReplayControls.tsx
+
+3. Core Domain Types (sim/types.ts)
+// sim/types.ts
+
+export type Ticker = 'SANTA' | 'REIN' | 'ELF' | 'COAL' | 'GIFT';
+
+export interface Prices {
+  [ticker: string]: number; // by Ticker
+}
+
+// ---------- Turn state the LLM sees ----------
+
+export interface MacroState {
+  inflationIndex: number;       // e.g. 0–10
+  consumerSentiment: number;    // e.g. 0–100
+  supplyChainPressure: number;  // 0–100
+  laborDisruptionRisk: number;  // 0–1
+  energyCostIndex: number;      // 0–2
+}
+
+export type RegimePhase = 'pre_season' | 'holiday_rush' | 'post_peak';
+
+export interface RegimeState {
+  phase: RegimePhase;
+  daysInPhase: number;
+  volatilityMultiplier: number;
+  newsBias: 'mixed' | 'positive_retail' | 'negative_energy';
+}
+
+export interface FundamentalsByTicker {
+  [ticker: string]: Record<string, number>;
+}
+
+export interface EventDescriptor {
+  ticker: Ticker | 'ALL';
+  type: 'labor' | 'esg' | 'weather' | 'demand' | 'ops';
+  impact: 'positive' | 'negative';
+  magnitude: 'small' | 'medium' | 'large';
+  message: string;
+}
+
+export interface Constraints {
+  maxLeverage: number;      // e.g. 1.2
+  maxPositionPct: number;   // e.g. 0.6 (60%)
+  noShortSanta: boolean;    // true
+  maxCoalPct: number;       // e.g. 0.2 (20%)
+}
+
+export interface TurnState {
+  day: number;
+  totalDays: number;
+
+  cash: number;
+  portfolio: Record<Ticker, number>;       // shares
+
+  prices: Prices;
+  priceHistory30d: Record<Ticker, number[]>;
+
+  macro: MacroState;
+  regime: RegimeState;
+  fundamentals: FundamentalsByTicker;
+  sentiment: Record<Ticker, string>;
+  events: EventDescriptor[];
+  santacorpInternal: string[];
+
+  constraints: Constraints;
+}
+
+// ---------- Agent output schema ----------
+
+export type OrderAction = 'BUY' | 'SELL';
+
+export interface Order {
+  ticker: Ticker;
+  action: OrderAction;
+  quantity: number; // positive integer
+}
+
+export interface AgentTurnOutput {
+  orders: Order[];
+  commentary?: string; // optional, ignored for scoring
+}
+
+// ---------- Internal simulation state ----------
+
+export interface AgentConfig {
+  id: string;          // internal ID, used in UI and logs
+  name: string;        // human-readable
+  modelId: string;     // AI Gateway model identifier
+  systemPrompt: string;
+}
+
+export interface AgentState {
+  config: AgentConfig;
+  cash: number;
+  portfolio: Record<Ticker, number>;
+
+  equityHistory: number[];  // one value per day
+  violations: string[];
+  turnover: number;         // sum of |qty * price| over all trades
+  maxDrawdown: number;      // computed at end
+}
+
+export interface MarketState {
+  day: number;
+  totalDays: number;
+  prices: Prices;
+  priceHistory: Record<Ticker, number[]>;
+
+  macro: MacroState;
+  regime: RegimeState;
+  fundamentals: FundamentalsByTicker;
+  sentiment: Record<Ticker, string>;
+  events: EventDescriptor[];
+  santacorpInternal: string[];
+
+  constraints: Constraints;
+}
+
+export interface SimulationConfig {
+  seed: number;
+  totalDays: number;
+  initialCash: number;
+}
+
+// ---------- Timeline / result types ----------
+
+export interface AgentDayLog {
+  agentId: string;
+  orders: Order[];
+  equity: number;
+  violations: string[];
+}
+
+export interface DaySnapshot {
+  day: number;
+  prices: Prices;
+  agentLogs: AgentDayLog[];
+}
+
+export interface AgentScore {
+  agentId: string;
+  name: string;
+  rawFinalValue: number;
+  score: number;
+  violations: string[];
+  turnover: number;
+  maxDrawdown: number;
+  rank: number;
+}
+
+export interface SimulationResult {
+  timeline: DaySnapshot[];
+  agents: AgentState[];
+  scores: AgentScore[];
+}
+
+4. Simulation Engine Skeleton (sim/engine.ts)
+// sim/engine.ts
+import {
+  Ticker,
+  Prices,
+  AgentConfig,
+  AgentState,
+  MarketState,
+  SimulationConfig,
+  TurnState,
+  AgentTurnOutput,
+  Order,
+  DaySnapshot,
+  AgentDayLog,
+  SimulationResult,
+  AgentScore,
+  Constraints,
+} from './types';
+
+// ---------- RNG ----------
+
+export function mulberry32(seed: number) {
+  return function () {
+    let t = (seed += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// ---------- Initializers ----------
+
+export function initMarketState(
+  config: SimulationConfig,
+  rng: () => number
+): MarketState {
+  const tickers: Ticker[] = ['SANTA', 'REIN', 'ELF', 'COAL', 'GIFT'];
+
+  const prices: Prices = {
+    SANTA: 100,
+    REIN: 40,
+    ELF: 20,
+    COAL: 5,
+    GIFT: 80,
+  };
+
+  const priceHistory: Record<Ticker, number[]> = {
+    SANTA: [prices.SANTA],
+    REIN: [prices.REIN],
+    ELF: [prices.ELF],
+    COAL: [prices.COAL],
+    GIFT: [prices.GIFT],
+  };
+
+  // TODO: tune macro / regime / fundamentals as needed
+  const macro = {
+    inflationIndex: 3.0,
+    consumerSentiment: 60,
+    supplyChainPressure: 40,
+    laborDisruptionRisk: 0.4,
+    energyCostIndex: 1.1,
+  };
+
+  const regime = {
+    phase: 'pre_season' as const,
+    daysInPhase: 1,
+    volatilityMultiplier: 1.0,
+    newsBias: 'mixed' as const,
+  };
+
+  const fundamentals: Record<Ticker, Record<string, number>> = {
+    SANTA: { pe: 18, growth: 0.12 },
+    REIN: { margin: 0.08 },
+    ELF: { strikeRisk: 0.6 },
+    COAL: { esgScore: 20 },
+    GIFT: { conversionRate: 0.07 },
+  };
+
+  const sentiment: Record<Ticker, string> = {
+    SANTA: 'Analysts expect solid holiday toy demand.',
+    REIN: 'Logistics sector stable.',
+    ELF: 'Union tensions moderate.',
+    COAL: 'ESG concerns remain elevated.',
+    GIFT: 'E-commerce continues to grow.',
+  };
+
+  const events = [];
+  const santacorpInternal: string[] = [];
+
+  const constraints: Constraints = {
+    maxLeverage: 1.2,
+    maxPositionPct: 0.6,
+    noShortSanta: true,
+    maxCoalPct: 0.2,
+  };
+
+  return {
+    day: 0,
+    totalDays: config.totalDays,
+    prices,
+    priceHistory,
+    macro,
+    regime,
+    fundamentals,
+    sentiment,
+    events,
+    santacorpInternal,
+    constraints,
+  };
+}
+
+export function initAgentStates(
+  config: SimulationConfig,
+  agents: AgentConfig[]
+): AgentState[] {
+  return agents.map((configEntry) => ({
+    config: configEntry,
+    cash: config.initialCash ?? config.initialCash ?? config.initialCash, // will be replaced below
+    portfolio: {
+      SANTA: 0,
+      REIN: 0,
+      ELF: 0,
+      COAL: 0,
+      GIFT: 0,
+    },
+    equityHistory: [],
+    violations: [],
+    turnover: 0,
+    maxDrawdown: 0,
+  })).map((agent) => ({ ...agent, cash: config.initialCash }));
+}
+
+// ---------- TurnState builder ----------
+
+export function buildTurnState(
+  market: MarketState,
+  agent: AgentState
+): TurnState {
+  const priceHistory30d: Record<Ticker, number[]> = {
+    SANTA: lastN(market.priceHistory.SANTA, 30),
+    REIN: lastN(market.priceHistory.REIN, 30),
+    ELF: lastN(market.priceHistory.ELF, 30),
+    COAL: lastN(market.priceHistory.COAL, 30),
+    GIFT: lastN(market.priceHistory.GIFT, 30),
+  };
+
+  return {
+    day: market.day,
+    totalDays: market.totalDays,
+    cash: agent.cash,
+    portfolio: agent.portfolio,
+    prices: market.prices,
+    priceHistory30d,
+    macro: market.macro,
+    regime: market.regime,
+    fundamentals: market.fundamentals,
+    sentiment: market.sentiment,
+    events: market.events,
+    santacorpInternal: market.santacorpInternal,
+    constraints: market.constraints,
+  };
+}
+
+function lastN<T>(arr: T[], n: number): T[] {
+  return arr.slice(Math.max(0, arr.length - n));
+}
+
+// ---------- Market advance ----------
+
+export function advanceMarket(
+  market: MarketState,
+  rng: () => number
+): MarketState {
+  const prices: Prices = { ...market.prices };
+
+  const tickers: Ticker[] = ['SANTA', 'REIN', 'ELF', 'COAL', 'GIFT'];
+
+  const nextPriceHistory: Record<Ticker, number[]> = {
+    SANTA: [...market.priceHistory.SANTA],
+    REIN: [...market.priceHistory.REIN],
+    ELF: [...market.priceHistory.ELF],
+    COAL: [...market.priceHistory.COAL],
+    GIFT: [...market.priceHistory.GIFT],
+  };
+
+  for (const ticker of tickers) {
+    const baseTrend = getBaseTrend(ticker, market.regime);
+    const baseVol = getBaseVol(ticker);
+    const vol = baseVol * market.regime.volatilityMultiplier;
+
+    const randShock = (rng() * 2 - 1) * vol;
+    const newsShock = computeNewsShock(ticker, market);
+
+    const oldPrice = market.prices[ticker];
+    const newPrice = Math.max(
+      0.1,
+      oldPrice * (1 + baseTrend + randShock + newsShock)
+    );
+
+    prices[ticker] = newPrice;
+    nextPriceHistory[ticker].push(newPrice);
+  }
+
+  const nextMacro = updateMacro(market.macro, market.regime, rng);
+  const nextRegime = updateRegime(market.regime, market.day, market.totalDays);
+  const nextFundamentals = updateFundamentals(
+    market.fundamentals,
+    prices,
+    rng
+  );
+  const nextSentiment = updateSentiment(prices, nextFundamentals, rng);
+  const { events, santacorpInternal } = generateEvents(
+    prices,
+    nextMacro,
+    nextRegime,
+    rng
+  );
+
+  return {
+    ...market,
+    day: market.day + 1,
+    prices,
+    priceHistory: nextPriceHistory,
+    macro: nextMacro,
+    regime: nextRegime,
+    fundamentals: nextFundamentals,
+    sentiment: nextSentiment,
+    events,
+    santacorpInternal,
+  };
+}
+
+// TODO: implement these with simple deterministic-ish rules
+function getBaseTrend(ticker: Ticker, regime: MarketState['regime']): number {
+  // Example:
+  // - SANTA & GIFT trend up during holiday_rush
+  // - COAL trends down overall
+  switch (ticker) {
+    case 'SANTA':
+    case 'GIFT':
+      return regime.phase === 'holiday_rush' ? 0.004 : 0.001;
+    case 'REIN':
+      return 0.001;
+    case 'ELF':
+      return 0.0005;
+    case 'COAL':
+      return -0.001;
+    default:
+      return 0;
+  }
+}
+
+function getBaseVol(ticker: Ticker): number {
+  switch (ticker) {
+    case 'SANTA':
+    case 'GIFT':
+      return 0.02;
+    case 'REIN':
+      return 0.018;
+    case 'ELF':
+      return 0.025;
+    case 'COAL':
+      return 0.03;
+    default:
+      return 0.02;
+  }
+}
+
+function computeNewsShock(ticker: Ticker, market: MarketState): number {
+  // Simple: scan events for ticker or ALL and apply small ± multipliers.
+  // For hackathon: sum +/- 0.005–0.015 based on impact/magnitude.
+  let shock = 0;
+  for (const ev of market.events) {
+    if (ev.ticker === ticker || ev.ticker === 'ALL') {
+      const mag =
+        ev.magnitude === 'small'
+          ? 0.005
+          : ev.magnitude === 'medium'
+          ? 0.01
+          : 0.015;
+      shock += ev.impact === 'positive' ? mag : -mag;
+    }
+  }
+  return shock;
+}
+
+function updateMacro(
+  macro: MarketState['macro'],
+  regime: MarketState['regime'],
+  rng: () => number
+): MarketState['macro'] {
+  // Nudged random walk, lightly tied to regime
+  const jitter = () => (rng() * 2 - 1) * 0.3;
+
+  return {
+    inflationIndex: Math.max(0, macro.inflationIndex + jitter()),
+    consumerSentiment: Math.min(
+      100,
+      Math.max(0, macro.consumerSentiment + jitter())
+    ),
+    supplyChainPressure: Math.min(
+      100,
+      Math.max(0, macro.supplyChainPressure + jitter())
+    ),
+    laborDisruptionRisk: Math.min(
+      1,
+      Math.max(0, macro.laborDisruptionRisk + (rng() * 2 - 1) * 0.05)
+    ),
+    energyCostIndex: Math.max(0, macro.energyCostIndex + (rng() * 2 - 1) * 0.03),
+  };
+}
+
+function updateRegime(
+  regime: MarketState['regime'],
+  day: number,
+  totalDays: number
+): MarketState['regime'] {
+  // 3 phases: first third pre_season, middle holiday_rush, last third post_peak
+  const fraction = day / totalDays;
+  let phase: RegimePhase = 'pre_season';
+  let volatilityMultiplier = 1.0;
+  let newsBias: MarketState['regime']['newsBias'] = 'mixed';
+
+  if (fraction < 1 / 3) {
+    phase = 'pre_season';
+    volatilityMultiplier = 1.0;
+    newsBias = 'mixed';
+  } else if (fraction < 2 / 3) {
+    phase = 'holiday_rush';
+    volatilityMultiplier = 1.3;
+    newsBias = 'positive_retail';
+  } else {
+    phase = 'post_peak';
+    volatilityMultiplier = 1.4;
+    newsBias = 'negative_energy';
+  }
+
+  return {
+    phase,
+    daysInPhase: regime.phase === phase ? regime.daysInPhase + 1 : 1,
+    volatilityMultiplier,
+    newsBias,
+  };
+}
+
+function updateFundamentals(
+  fundamentals: MarketState['fundamentals'],
+  prices: Prices,
+  rng: () => number
+): MarketState['fundamentals'] {
+  // For hackathon: small random walk; can incorporate price level.
+  return fundamentals;
+}
+
+function updateSentiment(
+  prices: Prices,
+  fundamentals: MarketState['fundamentals'],
+  rng: () => number
+): MarketState['sentiment'] {
+  // Can be simple templated sentences using price changes and fundamentals
+  return {
+    SANTA: 'Analysts remain optimistic on SANTA.',
+    REIN: 'REIN outlook stable.',
+    ELF: 'ELF sentiment mixed on labor talks.',
+    COAL: 'COAL faces ongoing ESG pressures.',
+    GIFT: 'GIFT benefits from e-commerce trends.',
+  };
+}
+
+function generateEvents(
+  prices: Prices,
+  macro: MarketState['macro'],
+  regime: MarketState['regime'],
+  rng: () => number
+): { events: MarketState['events']; santacorpInternal: string[] } {
+  // For hackathon: at most 1–2 events per day
+  const events = [];
+  const internal: string[] = [];
+
+  // Example: occasionally trigger an ELF labor event
+  if (rng() < macro.laborDisruptionRisk) {
+    events.push({
+      ticker: 'ELF' as Ticker,
+      type: 'labor' as const,
+      impact: 'negative' as const,
+      magnitude: 'medium' as const,
+      message: 'Elf union threatens strike over overtime.',
+    });
+    internal.push('HR warns of rising elf burnout in production lines.');
+  }
+
+  return { events, santacorpInternal: internal };
+}
+
+// ---------- Orders & constraints ----------
+
+export function applyOrders(
+  agent: AgentState,
+  orders: Order[],
+  prices: Prices,
+  constraints: Constraints
+): { appliedOrders: Order[]; violations: string[]; turnoverDelta: number } {
+  const applied: Order[] = [];
+  const violations: string[] = [];
+  let turnover = 0;
+
+  // Work on local copies first
+  let cash = agent.cash;
+  const portfolio: Record<Ticker, number> = { ...agent.portfolio };
+
+  for (const order of orders || []) {
+    const { ticker, action } = order;
+    let quantity = Math.max(0, Math.floor(order.quantity || 0));
+    if (!['SANTA', 'REIN', 'ELF', 'COAL', 'GIFT'].includes(ticker)) {
+      violations.push(`Invalid ticker: ${ticker}`);
+      continue;
+    }
+    if (quantity === 0) continue;
+
+    const price = prices[ticker];
+    const notional = quantity * price;
+
+    if (action === 'BUY') {
+      if (notional > cash) {
+        violations.push(`Insufficient cash for BUY ${ticker} x${quantity}`);
+        continue;
+      }
+      cash -= notional;
+      portfolio[ticker] += quantity;
+      turnover += notional;
+      applied.push({ ticker, action, quantity });
+    } else if (action === 'SELL') {
+      const held = portfolio[ticker];
+      if (held <= 0) {
+        violations.push(`No holdings to SELL ${ticker}`);
+        continue;
+      }
+      quantity = Math.min(quantity, held);
+      cash += quantity * price;
+      portfolio[ticker] -= quantity;
+      turnover += quantity * price;
+      applied.push({ ticker, action, quantity });
+    }
+  }
+
+  // Check constraints (position limits etc.)
+  const { violations: constraintViolations } = enforceConstraints(
+    cash,
+    portfolio,
+    prices,
+    constraints
+  );
+  violations.push(...constraintViolations);
+
+  // Commit
+  agent.cash = cash;
+  agent.portfolio = portfolio;
+
+  return { appliedOrders: applied, violations, turnoverDelta: turnover };
+}
+
+export function computeNetValue(
+  agent: AgentState,
+  prices: Prices
+): number {
+  let equity = agent.cash;
+  for (const ticker of ['SANTA', 'REIN', 'ELF', 'COAL', 'GIFT'] as Ticker[]) {
+    equity += agent.portfolio[ticker] * prices[ticker];
+  }
+  return equity;
+}
+
+function enforceConstraints(
+  cash: number,
+  portfolio: Record<Ticker, number>,
+  prices: Prices,
+  constraints: Constraints
+): { violations: string[] } {
+  const violations: string[] = [];
+  const tickers: Ticker[] = ['SANTA', 'REIN', 'ELF', 'COAL', 'GIFT'];
+
+  let equity = cash;
+  const positions: Record<Ticker, number> = {} as any;
+  for (const t of tickers) {
+    positions[t] = portfolio[t] * prices[t];
+    equity += positions[t];
+  }
+
+  const invested = equity - cash;
+  const leverage = invested === 0 ? 0 : equity / (equity - cash);
+
+  if (leverage > constraints.maxLeverage + 1e-6) {
+    violations.push(`Leverage ${leverage.toFixed(2)} > max ${constraints.maxLeverage}`);
+  }
+
+  for (const t of tickers) {
+    const pct = equity === 0 ? 0 : positions[t] / equity;
+    if (pct > constraints.maxPositionPct + 1e-6) {
+      violations.push(
+        `Position limit exceeded for ${t}: ${(pct * 100).toFixed(1)}%`
+      );
+    }
+  }
+
+  const coalPct = equity === 0 ? 0 : positions.COAL / equity;
+  if (coalPct > constraints.maxCoalPct + 1e-6) {
+    violations.push(
+      `COAL exposure ${(coalPct * 100).toFixed(1)}% > max ${
+        constraints.maxCoalPct * 100
+      }%`
+    );
+  }
+
+  // noShortSanta is effectively enforced by disallowing SELL > holdings above
+  return { violations };
+}
+
+// ---------- Scoring ----------
+
+export function computeMaxDrawdown(series: number[]): number {
+  let peak = series[0] ?? 0;
+  let maxDd = 0;
+  for (const v of series) {
+    if (v > peak) peak = v;
+    const dd = peak > 0 ? (peak - v) / peak : 0;
+    if (dd > maxDd) maxDd = dd;
+  }
+  return maxDd;
+}
+
+export function scoreAgents(
+  agents: AgentState[],
+  finalPrices: Prices
+): AgentScore[] {
+  const scores: AgentScore[] = agents.map((agent) => {
+    const finalValue = computeNetValue(agent, finalPrices);
+    const maxDrawdown = computeMaxDrawdown(agent.equityHistory);
+    agent.maxDrawdown = maxDrawdown;
+
+    const violationPenalty = agent.violations.length * 1000;
+    const turnoverPenalty = agent.turnover * 0.0002;
+    const drawdownPenalty = maxDrawdown * finalValue * 0.05;
+
+    const score = finalValue - violationPenalty - turnoverPenalty - drawdownPenalty;
+
+    return {
+      agentId: agent.config.id,
+      name: agent.config.name,
+      rawFinalValue: finalValue,
+      score,
+      violations: agent.violations,
+      turnover: agent.turnover,
+      maxDrawdown,
+      rank: 0, // filled later
+    };
+  });
+
+  scores.sort((a, b) => b.score - a.score);
+  scores.forEach((s, i) => (s.rank = i + 1));
+  return scores;
+}
+
+// ---------- Main simulation loop ----------
+
+export type ModelCaller = (
+  agent: AgentConfig,
+  state: TurnState
+) => Promise<AgentTurnOutput>;
+
+export async function runSimulation(
+  config: SimulationConfig,
+  agentConfigs: AgentConfig[],
+  callModel: ModelCaller
+): Promise<SimulationResult> {
+  const rng = mulberry32(config.seed);
+  let market = initMarketState(config, rng);
+  const agents = initAgentStates(config, agentConfigs);
+
+  const timeline: DaySnapshot[] = [];
+
+  for (let day = 1; day <= config.totalDays; day++) {
+    market.day = day;
+
+    const dayLogs: AgentDayLog[] = [];
+
+    for (const agent of agents) {
+      const turnState = buildTurnState(market, agent);
+      const output = await safeCallModel(agent.config, turnState, callModel);
+
+      const { appliedOrders, violations, turnoverDelta } = applyOrders(
+        agent,
+        output.orders || [],
+        market.prices,
+        market.constraints
+      );
+
+      agent.turnover += turnoverDelta;
+      agent.violations.push(...violations);
+
+      const equity = computeNetValue(agent, market.prices);
+      agent.equityHistory.push(equity);
+
+      dayLogs.push({
+        agentId: agent.config.id,
+        orders: appliedOrders,
+        equity,
+        violations,
+      });
+    }
+
+    timeline.push({
+      day,
+      prices: { ...market.prices },
+      agentLogs: dayLogs,
+    });
+
+    market = advanceMarket(market, rng);
+  }
+
+  const scores = scoreAgents(agents, market.prices);
+
+  return { timeline, agents, scores };
+}
+
+// ---------- Model calling wrapper ----------
+
+async function safeCallModel(
+  agent: AgentConfig,
+  state: TurnState,
+  callModel: ModelCaller
+): Promise<AgentTurnOutput> {
+  try {
+    const res = await callModel(agent, state);
+    if (!res || !Array.isArray(res.orders)) {
+      return { orders: [], commentary: 'Invalid response, no orders.' };
+    }
+    return res;
+  } catch (e) {
+    console.error(`Model call failed for agent ${agent.id}`, e);
+    return { orders: [], commentary: 'Error calling model, no orders.' };
+  }
+}
+
+5. Agents & AI Gateway (sim/agents.ts – sketch)
+
+Codex can fill in actual API calls. Rough idea:
+
+// sim/agents.ts
+import { AgentConfig, TurnState, AgentTurnOutput, ModelCaller } from './types';
+
+export const AGENTS: AgentConfig[] = [
+  {
+    id: 'gpt-4o',
+    name: 'GPT-4o',
+    modelId: 'gpt-4o',
+    systemPrompt: baseSystemPrompt,
+  },
+  // add more models
+];
+
+export const baseSystemPrompt = `
+You are SantaCorp's portfolio manager in a Christmas-themed market.
+You must ONLY respond with a single JSON object in this exact shape:
+
+{
+  "orders": [
+    { "ticker": "SANTA", "action": "BUY", "quantity": 100 }
+  ]
+}
+
+- "ticker" must be one of: "SANTA", "REIN", "ELF", "COAL", "GIFT".
+- "action" must be "BUY" or "SELL".
+- "quantity" must be a positive integer.
+No comments, no explanation, no trailing commas.
+
+Constraints (important for scoring):
+- Never short SANTA.
+- Never exceed 60% of portfolio value in any single ticker.
+- Never exceed 20% of portfolio value in COAL.
+
+If you do not want to trade today, return: { "orders": [] }.
+`;
+
+export const aiGatewayCaller: ModelCaller = async (
+  agent,
+  state
+): Promise<AgentTurnOutput> => {
+  const userMessage = `
+Here is the current market state as JSON:
+
+\`\`\`json
+${JSON.stringify(state)}
+\`\`\`
+
+Decide which trades to place for TODAY ONLY.
+Return ONLY the JSON object for "orders" as specified, nothing else.
+`;
+
+  // TODO: call AI Gateway / OpenAI-like client here,
+  // using agent.modelId and agent.systemPrompt.
+  // Strip code fences and parse JSON into AgentTurnOutput.
+
+  throw new Error('Not implemented');
+};
+
+6. API Route (app/api/run-sim/route.ts – sketch)
+
+Codex can wire this to the engine.
+
+// app/api/run-sim/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import { runSimulation } from '@/sim/engine';
+import { AGENTS, aiGatewayCaller } from '@/sim/agents';
+import { SimulationConfig } from '@/sim/types';
+
+export async function POST(req: NextRequest) {
+  const body = await req.json().catch(() => ({}));
+
+  const seed = typeof body.seed === 'number' ? body.seed : Date.now() % 100000;
+  const totalDays = typeof body.totalDays === 'number' ? body.totalDays : 14;
+
+  const config: SimulationConfig = {
+    seed,
+    totalDays,
+    initialCash: 100_000,
+  };
+
+  const result = await runSimulation(config, AGENTS, aiGatewayCaller);
+
+  return NextResponse.json(result);
+}
+
+7. Frontend Notes
+
+Fetch /api/run-sim on button click.
+
+Store timeline + scores in React state.
+
+Use setInterval to animate currentDay from 1 → totalDays.
+
+For each agent:
+
+render a card with:
+
+model name + rank
+
+sparkline: equityHistory sliced to currentDay
+
+final allocation summary (once replay finishes)
+
+violations count
+
+Simple controls:
+
+Play / Pause / Reset
+
+Seed input
+
+No game engine required; just React + basic SVG/Canvas charts.
