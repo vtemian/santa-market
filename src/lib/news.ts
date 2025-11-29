@@ -59,6 +59,11 @@ export function getSeasonalContext(date: Date): Season {
   const month = date.getMonth() + 1;
   const day = date.getDate();
 
+  // November is early season (pre-holiday buildup)
+  if (month === 11) {
+    return 'early_season';
+  }
+
   if (month === 12) {
     if (day <= 10) return 'early_season';
     if (day <= 17) return 'peak_shopping';
@@ -74,8 +79,8 @@ export function generateNews(date: Date, random: () => number): NewsEvent | null
   const season = getSeasonalContext(date);
   const pool = NEWS_POOLS[season];
 
-  // 30% chance of news each tick
-  if (random() > 0.3) {
+  // 70% chance of news each tick
+  if (random() > 0.7) {
     return null;
   }
 

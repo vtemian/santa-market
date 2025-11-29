@@ -18,12 +18,13 @@ export function ModelThoughts({
   selectedDay,
 }: ModelThoughtsProps) {
   const [expandedAgents, setExpandedAgents] = useState<Set<string>>(new Set());
+  const [showPrompts, setShowPrompts] = useState<Set<string>>(new Set());
 
   const snapshot = timeline.find((s) => s.day === selectedDay);
 
   if (!snapshot) {
     return (
-      <div className="border-2 border-foreground bg-card h-full flex items-center justify-center">
+      <div className="border-2 border-foreground bg-card flex items-center justify-center" style={{ height: '788px' }}>
         <p className="terminal-text text-muted-foreground">
           Select a day to view model reasoning
         </p>
@@ -41,6 +42,16 @@ export function ModelThoughts({
     setExpandedAgents(newExpanded);
   };
 
+  const togglePrompt = (agentId: string) => {
+    const newPrompts = new Set(showPrompts);
+    if (newPrompts.has(agentId)) {
+      newPrompts.delete(agentId);
+    } else {
+      newPrompts.add(agentId);
+    }
+    setShowPrompts(newPrompts);
+  };
+
   const formatOrders = (orders: Order[]): string => {
     if (orders.length === 0) return 'No trades';
     return orders.map((o) => `${o.action} ${o.ticker} x${o.quantity}`).join(', ');
@@ -49,21 +60,23 @@ export function ModelThoughts({
   const shouldTruncate = (text: string): boolean => text.length > 200;
 
   return (
-    <div className="border-2 border-foreground bg-card h-full flex flex-col" style={{ minHeight: '400px' }}>
-      <div className="border-b-2 border-foreground px-4 py-2 flex items-center justify-between">
+    <div className="border-2 border-foreground bg-card flex flex-col" style={{ height: '788px' }}>
+      <div className="border-b-2 border-foreground px-4 py-2 flex items-center justify-between shrink-0">
         <span className="terminal-header">MODEL REASONING</span>
         <span className="font-mono text-xs text-muted-foreground">DAY {selectedDay}</span>
       </div>
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 min-h-0">
         <div className="p-4 space-y-3">
           {snapshot.agentLogs.map((log) => {
             const agentScore = scores.find((s) => s.agentId === log.agentId);
             const isExpanded = expandedAgents.has(log.agentId);
+            const promptVisible = showPrompts.has(log.agentId);
             const needsTruncation = shouldTruncate(log.reasoning);
             const displayText =
               isExpanded || !needsTruncation
                 ? log.reasoning
                 : log.reasoning.substring(0, 200) + '...';
+            const prompt = (log as any).prompt as string | undefined;
 
             return (
               <div
@@ -74,13 +87,30 @@ export function ModelThoughts({
                   <span className="terminal-header text-xs">
                     {agentScore?.name || log.agentId}
                   </span>
-                  {agentScore && (
-                    <span className="font-mono text-xs text-muted-foreground uppercase">
-                      {agentScore.tradingStyle}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {prompt && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => togglePrompt(log.agentId)}
+                        className="h-5 px-2 text-xs font-mono rounded-none"
+                      >
+                        {promptVisible ? 'HIDE INPUT' : 'SHOW INPUT'}
+                      </Button>
+                    )}
+                  </div>
                 </div>
 
+                {promptVisible && prompt && (
+                  <div className="bg-muted/50 border border-muted p-2 -mx-1">
+                    <div className="terminal-header text-xs text-primary mb-1">INPUT PROMPT</div>
+                    <pre className="font-mono text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap overflow-x-auto">
+                      {prompt}
+                    </pre>
+                  </div>
+                )}
+
+                <div className="terminal-header text-xs text-secondary mb-1">MODEL RESPONSE</div>
                 <p className="font-mono text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
                   {displayText}
                 </p>

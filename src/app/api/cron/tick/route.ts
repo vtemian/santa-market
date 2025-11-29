@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { advanceMarket, getMarketState, getAgents, updateAgentPortfolio, recordTrade } from '@/lib/market';
+import { advanceMarket, getMarketState, getAgents, updateAgentPortfolio, recordTrade, applyTradePressure } from '@/lib/market';
 import { callModelTwoPhase, MODEL_IDS } from '@/sim/ai-gateway';
 
 const AGENTS_CONFIG = [
@@ -27,9 +27,11 @@ export async function GET(request: NextRequest) {
     const agentRows = await getAgents();
 
     // 3. Call all AI agents in parallel
+    const allExecutedOrders: Array<{ ticker: string; action: string; quantity: number }> = [];
+
     const agentCalls = AGENTS_CONFIG.map(async (config) => {
       const agentRow = agentRows.find(a => a.id === config.id);
-      if (!agentRow) return null;
+      if (!agentRow) return { agentId: config.id, success: false, orders: [] };
 
       const holdings = agentRow.holdings as Record<string, number>;
       const cash = parseFloat(agentRow.cash);
@@ -99,17 +101,28 @@ export async function GET(request: NextRequest) {
         await updateAgentPortfolio(config.id, newCash, newHoldings, prices);
 
         // Record trade
-        await recordTrade(state.tickNumber, config.id, result.reasoning, executedOrders);
+        await recordTrade(state.tickNumber, config.id, result.prompt, result.reasoning, executedOrders);
 
-        return { agentId: config.id, success: true };
+        return { agentId: config.id, success: true, orders: executedOrders };
       } catch (error) {
         console.error(`Agent ${config.id} failed:`, error);
-        await recordTrade(state.tickNumber, config.id, `Error: ${error}`, []);
-        return { agentId: config.id, success: false };
+        await recordTrade(state.tickNumber, config.id, '', `Error: ${error}`, []);
+        return { agentId: config.id, success: false, orders: [] };
       }
     });
 
-    await Promise.all(agentCalls);
+    const results = await Promise.all(agentCalls);
+
+    // 4. Collect all executed orders and apply trade pressure
+    for (const result of results) {
+      if (result?.orders) {
+        allExecutedOrders.push(...result.orders);
+      }
+    }
+
+    if (allExecutedOrders.length > 0) {
+      await applyTradePressure(allExecutedOrders);
+    }
 
     return NextResponse.json({
       success: true,

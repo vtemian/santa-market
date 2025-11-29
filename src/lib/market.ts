@@ -150,13 +150,65 @@ export async function updateAgentPortfolio(
 export async function recordTrade(
   tickNumber: number,
   agentId: string,
+  prompt: string,
   reasoning: string,
   orders: Array<{ ticker: string; action: string; quantity: number; price: number }>
 ) {
   await db.insert(trades).values({
     tickNumber,
     agentId,
+    prompt,
     reasoning,
     orders,
   });
+}
+
+/**
+ * Apply trade pressure to prices based on net buy/sell volume.
+ * Formula: price impact = 0.1% per 100 net shares traded
+ * Buys push price up, sells push price down.
+ */
+export async function applyTradePressure(
+  allOrders: Array<{ ticker: string; action: string; quantity: number }>
+) {
+  const state = await getMarketState();
+  if (!state) return;
+
+  // Calculate net volume per ticker (positive = net buying, negative = net selling)
+  const netVolume: Record<string, number> = {};
+  for (const order of allOrders) {
+    const delta = order.action === 'BUY' ? order.quantity : -order.quantity;
+    netVolume[order.ticker] = (netVolume[order.ticker] || 0) + delta;
+  }
+
+  // Apply price pressure: 0.1% per 100 net shares
+  const PRESSURE_FACTOR = 0.001; // 0.1% per 100 shares
+  const BASE_VOLUME = 100;
+
+  const newPrices: Record<string, number> = { ...state.prices };
+  for (const ticker of TICKERS) {
+    if (netVolume[ticker]) {
+      const pressurePct = (netVolume[ticker] / BASE_VOLUME) * PRESSURE_FACTOR;
+      newPrices[ticker] = newPrices[ticker] * (1 + pressurePct);
+      // Clamp to bounds
+      newPrices[ticker] = Math.max(1, Math.min(500, newPrices[ticker]));
+      newPrices[ticker] = Math.round(newPrices[ticker] * 100) / 100;
+    }
+  }
+
+  // Update market state with new prices
+  await db.update(marketState).set({
+    prices: newPrices,
+    updatedAt: new Date(),
+  }).where(eq(marketState.id, 1));
+
+  // Also update the latest tick record
+  const [latestTick] = await db.select().from(ticks).orderBy(desc(ticks.tickNumber)).limit(1);
+  if (latestTick) {
+    await db.update(ticks).set({
+      prices: newPrices,
+    }).where(eq(ticks.tickNumber, latestTick.tickNumber));
+  }
+
+  return { netVolume, newPrices };
 }

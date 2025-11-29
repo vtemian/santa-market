@@ -31,6 +31,7 @@ export async function GET() {
     const tradesByAgent: Record<string, any> = {};
     for (const trade of recentTrades) {
       tradesByAgent[trade.agentId] = {
+        prompt: trade.prompt,
         reasoning: trade.reasoning,
         orders: trade.orders,
       };

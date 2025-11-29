@@ -23,23 +23,19 @@ const chartConfig = {
     label: 'GPT-4o',
     color: '#22c55e',
   },
-  'claude-3-7-sonnet': {
+  'claude-sonnet': {
     label: 'Claude Sonnet',
     color: '#3b82f6',
   },
-  'gemini-2-flash': {
-    label: 'Gemini Flash',
+  'gemini-pro': {
+    label: 'Gemini Pro',
     color: '#a855f7',
   },
-  'grok-2': {
+  'grok': {
     label: 'Grok',
     color: '#f59e0b',
   },
-  'llama-3-3': {
-    label: 'Llama 3.3',
-    color: '#ec4899',
-  },
-  'deepseek-3': {
+  'deepseek': {
     label: 'Deepseek V3',
     color: '#14b8a6',
   },
@@ -61,13 +57,26 @@ export function EquityChart({
 
   const agentIds = scores.map((score) => score.agentId);
 
+  // Calculate dynamic Y-axis domain based on actual data
+  const allValues = chartData.flatMap((point) =>
+    agentIds.map((id) => point[id]).filter((v): v is number => v !== undefined)
+  );
+  const minValue = allValues.length > 0 ? Math.min(...allValues) : 0;
+  const maxValue = allValues.length > 0 ? Math.max(...allValues) : 100000;
+  const range = maxValue - minValue;
+  const padding = range > 0 ? range * 0.1 : 1000; // 10% padding, or $1k if flat
+  const yDomain: [number, number] = [
+    Math.floor((minValue - padding) / 100) * 100,
+    Math.ceil((maxValue + padding) / 100) * 100,
+  ];
+
   return (
-    <div className="border-2 border-foreground bg-card h-full flex flex-col" style={{ minHeight: '400px' }}>
+    <div className="border-2 border-foreground bg-card">
       <div className="border-b-2 border-foreground px-4 py-2">
         <span className="terminal-header">PORTFOLIO PERFORMANCE</span>
       </div>
-      <div className="flex-1 p-4">
-        <ChartContainer config={chartConfig} className="h-full w-full" style={{ minHeight: '320px' }}>
+      <div className="p-4">
+        <ChartContainer config={chartConfig} className="w-full" style={{ height: '700px' }}>
           <LineChart
             data={chartData}
             margin={{ top: 5, right: 10, left: 10, bottom: 5 }}
@@ -87,11 +96,12 @@ export function EquityChart({
               style={{ fontFamily: 'monospace', fontSize: '10px' }}
             />
             <YAxis
+              domain={yDomain}
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-              width={50}
+              tickFormatter={(value) => `$${(value / 1000).toFixed(1)}k`}
+              width={55}
               style={{ fontFamily: 'monospace', fontSize: '10px' }}
             />
             <ChartTooltip

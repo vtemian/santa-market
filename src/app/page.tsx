@@ -21,6 +21,7 @@ interface MarketData {
     totalValue: number;
   }>;
   tradesByAgent: Record<string, {
+    prompt: string;
     reasoning: string;
     orders: Array<{ ticker: string; action: string; quantity: number; price: number }>;
   }>;
@@ -134,6 +135,7 @@ export default function Home() {
         return {
           agentId: agent.id,
           equity: agent.totalValue,
+          prompt: trade?.prompt || '',
           reasoning: trade?.reasoning || '',
           orders,
           violations: [],
@@ -179,7 +181,7 @@ export default function Home() {
             <nav className="hidden md:flex items-center gap-4">
               <span className="terminal-header text-primary">LIVE</span>
               <span className="text-muted-foreground">|</span>
-              <span className="terminal-header text-muted-foreground hover:text-foreground cursor-pointer">LEADERBOARD</span>
+              <a href="/about" className="terminal-header text-muted-foreground hover:text-foreground cursor-pointer">ABOUT</a>
             </nav>
           </div>
           <div className="flex items-center gap-3">

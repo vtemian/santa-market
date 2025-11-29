@@ -24,7 +24,7 @@ export const MODEL_IDS = {
 export async function callModelTwoPhase(
   agent: AgentConfig,
   state: TurnState
-): Promise<{ reasoning: string; orders: Order[] }> {
+): Promise<{ prompt: string; reasoning: string; orders: Order[] }> {
   const timeout = 30000; // 30 seconds
 
   try {
@@ -61,11 +61,12 @@ export async function callModelTwoPhase(
     // Parse JSON from Phase 2, strip markdown fences if present
     const orders = parseOrders(tradeResult.text);
 
-    return { reasoning, orders };
+    return { prompt: phase1Prompt, reasoning, orders };
   } catch (error) {
     console.error(`Model call failed for ${agent.id}:`, error);
     // Return empty orders on failure
     return {
+      prompt: '',
       reasoning: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
       orders: [],
     };

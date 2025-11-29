@@ -33,6 +33,7 @@ export const trades = pgTable('trades', {
   id: serial('id').primaryKey(),
   tickNumber: integer('tick_number').notNull(),
   agentId: text('agent_id').notNull(),
+  prompt: text('prompt'),
   reasoning: text('reasoning'),
   orders: jsonb('orders').$type<Array<{ ticker: string; action: string; quantity: number; price: number }>>(),
   timestamp: timestamp('timestamp').defaultNow(),
