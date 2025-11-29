@@ -1,5 +1,5 @@
 import { db, marketState, agents, ticks, trades } from '@/db';
-import { eq } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 import { generateNews, getSeasonalContext, applyNewsToPrice } from './news';
 
 const TICKERS = ['SANTA', 'REIN', 'ELF', 'GIFT', 'COAL'] as const;
@@ -29,11 +29,11 @@ export async function getMarketState() {
 }
 
 export async function getAgents() {
-  return db.select().from(agents).orderBy(agents.totalValue);
+  return db.select().from(agents).orderBy(desc(agents.totalValue));
 }
 
 export async function getRecentTicks(limit = 50) {
-  return db.select().from(ticks).orderBy(ticks.tickNumber).limit(limit);
+  return db.select().from(ticks).orderBy(desc(ticks.tickNumber)).limit(limit);
 }
 
 export async function getRecentTrades(tickNumber: number) {
