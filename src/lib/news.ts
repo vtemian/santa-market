@@ -1,6 +1,6 @@
 type Season = 'early_season' | 'peak_shopping' | 'crunch_time' | 'christmas_eve' | 'christmas_day' | 'post_christmas' | 'off_season';
 
-type NewsType = 'breaking' | 'analysis' | 'earnings' | 'rumor' | 'interview' | 'investigation';
+type NewsType = 'breaking' | 'analysis' | 'earnings' | 'rumor' | 'interview' | 'investigation' | 'black_swan';
 
 interface NewsEvent {
   type: NewsType;
@@ -8,6 +8,169 @@ interface NewsEvent {
   message: string;
   impact: Record<string, number>; // ticker -> % change
 }
+
+// Black swan events - rare but catastrophic/euphoric market-wide events
+const BLACK_SWAN_EVENTS: NewsEvent[] = [
+  {
+    type: 'black_swan',
+    headline: '🦠 PANDEMIC ALERT: Reindeer Flu Outbreak at North Pole',
+    message: `CATASTROPHIC DEVELOPMENT: A highly contagious strain of reindeer flu has swept through Santa's stables.
+
+Initial reports indicate 60% of the reindeer fleet is showing symptoms. Rudolph has been quarantined. Backup teams are being evaluated but the situation is dire.
+
+"This is unprecedented," said North Pole Health Director Dr. Snowflake Winters. "We're implementing emergency protocols but... I won't sugarcoat it. This is bad."
+
+REIN shares have halted trading twice already due to volatility. Circuit breakers triggered.
+
+Santa Corp has issued a force majeure warning. The workshop is continuing production but delivery logistics are in chaos.
+
+Markets are in freefall. This could be the worst crisis in North Pole history.
+
+[EMERGENCY: All positions at risk. Hedge accordingly.]`,
+    impact: { REIN: -25, SANTA: -18, ELF: -8, GIFT: -12, COAL: 15 }
+  },
+  {
+    type: 'black_swan',
+    headline: '💥 DISASTER: Explosion Rocks Main Workshop Complex',
+    message: `BREAKING: A massive explosion has destroyed Workshop 7, the largest toy production facility at the North Pole.
+
+Emergency services are on scene. Early reports suggest the blast originated in the experimental toy division. Casualty reports are unclear but evacuation is underway.
+
+"The building is... gone," said a visibly shaken witness. "Decades of work. The specialized equipment. The prototype toys for next year..."
+
+ELF Industries stock has collapsed. Trading volume is 50x normal as panic selling overwhelms the market.
+
+Santa has declared a state of emergency. Production has halted across ALL workshops pending safety review.
+
+The timing couldn't be worse. Peak season is approaching and capacity has been cut by an estimated 40%.
+
+[CRISIS: Supply chain catastrophically compromised. Recovery timeline unknown.]`,
+    impact: { ELF: -30, SANTA: -15, GIFT: -10, REIN: -5, COAL: 8 }
+  },
+  {
+    type: 'black_swan',
+    headline: '🎄 MIRACLE: Definitive Proof of Santa Goes Viral',
+    message: `THE WORLD HAS CHANGED: Undeniable video evidence of Santa Claus has gone viral, with 2 billion views in 3 hours.
+
+The footage, captured by a child's bedroom camera, shows Santa emerging from a chimney, placing gifts, eating cookies, and - crucially - his sleigh and reindeer departing into the sky.
+
+Experts have verified the video is not AI-generated or manipulated. Multiple independent analyses confirm authenticity.
+
+"This is the most significant event in modern history," declared one cultural commentator. "Everything we thought we knew..."
+
+Global markets are surging on the news. The "belief premium" is now quantifiable. Consumer confidence has spiked to all-time highs.
+
+North Pole stocks are experiencing their biggest single-day gains EVER. Circuit breakers triggered on the upside.
+
+The world believes. And belief is the most powerful force in the market.
+
+[EUPHORIA: Historic rally. All North Pole assets repricing higher.]`,
+    impact: { SANTA: 25, REIN: 20, ELF: 18, GIFT: 22, COAL: -10 }
+  },
+  {
+    type: 'black_swan',
+    headline: '📋 SCANDAL: Naughty List Database Leaked to Dark Web',
+    message: `BOMBSHELL: The complete Naughty/Nice database has been leaked online, exposing every child's behavioral record.
+
+The breach includes detailed reports, incident logs, and - most damaging - the algorithm Santa uses to make his list. Privacy advocates are calling it "the worst data breach in magical history."
+
+Parents are furious. Class action lawsuits are being filed. Regulators are demanding answers.
+
+"This is a fundamental violation of trust," said privacy expert Cipher Snowden. "Santa's entire operation depends on confidentiality."
+
+Santa Corp shares are in freefall on existential concerns. If children stop believing their behavior is being watched, the entire model breaks down.
+
+Meanwhile, COAL is surging as the leak confirmed the naughty list is 40% larger than previously disclosed.
+
+Mrs. Claus has scheduled an emergency press conference. The future of Christmas is in question.
+
+[EXISTENTIAL RISK: Trust collapse could be unrecoverable.]`,
+    impact: { SANTA: -22, REIN: -10, ELF: -8, GIFT: -15, COAL: 35 }
+  },
+  {
+    type: 'black_swan',
+    headline: '🤖 DISRUPTION: Amazon Announces "Prime Sleigh" Drone Fleet',
+    message: `COMPETITIVE NIGHTMARE: Amazon has unveiled "Prime Sleigh" - an autonomous drone delivery network capable of Christmas Eve global coverage.
+
+The system uses 50 million AI-powered drones, satellite coordination, and - most shockingly - technology that appears to manipulate time dilation for simultaneous worldwide delivery.
+
+"We've solved Christmas logistics," announced Jeff Bezos's hologram. "No reindeer required. No coal. Just packages, delivered perfectly, for Prime members."
+
+North Pole stocks are in crisis. The monopoly that has protected Santa Corp for centuries is under existential threat.
+
+Analysts are scrambling to model the competitive impact. Some see coexistence. Others predict a brutal market share war.
+
+"This is the disruption we always feared," admitted one Santa Corp board member. "We got complacent."
+
+The holiday season will never be the same.
+
+[DISRUPTION: Competitive moat breached. Strategic response required.]`,
+    impact: { SANTA: -20, REIN: -18, ELF: -12, GIFT: -8, COAL: 5 }
+  },
+  {
+    type: 'black_swan',
+    headline: '✨ PHENOMENON: Global Belief Surge Breaks Records',
+    message: `UNPRECEDENTED: A spontaneous global movement has triggered the largest surge in Christmas belief ever recorded.
+
+It started with a viral TikTok from a child in Norway, spread through a celebrity endorsement cascade, and culminated in a simultaneous worldwide "Believe" event with 500 million participants.
+
+The North Pole Belief Index hit 99.7% - a number previously thought impossible in the modern era.
+
+"We're seeing magic levels we haven't recorded since the 1800s," said Chief Magic Officer Sparkle Aurora. "The implications for operations are... extraordinary."
+
+All North Pole assets are surging. The belief premium is translating directly into operational efficiency and consumer demand.
+
+Santa Corp has upgraded guidance. ELF is announcing capacity expansion. REIN is reporting unprecedented reindeer performance metrics.
+
+This is what a paradigm shift looks like.
+
+[EUPHORIA: Belief is the ultimate currency. Market repricing accordingly.]`,
+    impact: { SANTA: 22, REIN: 18, ELF: 20, GIFT: 25, COAL: -15 }
+  },
+  {
+    type: 'black_swan',
+    headline: '❄️ CATASTROPHE: Polar Vortex Collapse Threatens North Pole',
+    message: `CLIMATE EMERGENCY: The polar vortex has collapsed in an unprecedented weather event, bringing extreme conditions to the North Pole.
+
+Temperatures have swung 40 degrees in 12 hours. Blizzard conditions have grounded all air operations. The main workshop complex is snowed in.
+
+"We've never seen anything like this," said meteorologist Flurry Stormwatch. "The weather models broke. Literally broke."
+
+All North Pole operations are suspended. Reindeer cannot fly. Elves cannot commute to work. Even the magical heating systems are struggling.
+
+Supply chains are frozen - literally. Deliveries to and from the North Pole have halted indefinitely.
+
+Santa has invoked emergency powers but options are limited. You can't negotiate with weather.
+
+The timing, weeks before Christmas, could not be worse. Recovery timeline: unknown.
+
+[FORCE MAJEURE: Operations paralyzed. All forecasts suspended.]`,
+    impact: { SANTA: -18, REIN: -22, ELF: -15, GIFT: -12, COAL: 10 }
+  },
+  {
+    type: 'black_swan',
+    headline: '🎁 WINDFALL: Anonymous Donor Gifts $100B to North Pole',
+    message: `STUNNING: An anonymous donor has transferred $100 billion to the North Pole Foundation, the largest charitable gift in history.
+
+The donation comes with a single condition: "Make Christmas better for everyone."
+
+Santa Corp has announced the funds will be used for:
+- Massive workshop expansion
+- Reindeer wellness and breeding programs
+- Gift quality improvements across all categories
+- Elf wage increases and benefits
+- Technology modernization
+
+"This changes everything," said Santa, visibly emotional. "Someone out there really believes in what we do."
+
+Markets are euphoric. The capital injection removes all financial constraints for the foreseeable future.
+
+Speculation about the donor's identity is rampant. Leading theories: Elon Musk, Warren Buffett's estate, or a sovereign wealth fund.
+
+[TRANSFORMATIONAL: Balance sheet transformed. Growth unlimited.]`,
+    impact: { SANTA: 20, REIN: 15, ELF: 22, GIFT: 18, COAL: -5 }
+  },
+];
 
 const NEWS_POOLS: Record<Season, NewsEvent[]> = {
   early_season: [
@@ -565,10 +728,20 @@ export function getSeasonalContext(date: Date): Season {
 }
 
 export function generateNews(date: Date, random: () => number): NewsEvent | null {
+  // 2% chance of BLACK SWAN event (rare but catastrophic)
+  if (random() < 0.02) {
+    const blackSwanIndex = Math.floor(random() * BLACK_SWAN_EVENTS.length);
+    const blackSwan = BLACK_SWAN_EVENTS[blackSwanIndex];
+    return {
+      ...blackSwan,
+      message: `[🚨 BLACK SWAN EVENT 🚨] ${blackSwan.headline}\n\n${blackSwan.message}`,
+    };
+  }
+
   const season = getSeasonalContext(date);
   const pool = NEWS_POOLS[season];
 
-  // 70% chance of news each tick
+  // 70% chance of regular news each tick
   if (random() > 0.7) {
     return null;
   }
