@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { EquityChart } from '@/components/equity-chart';
 import { ModelThoughts } from '@/components/model-thoughts';
 import { AgentCard } from '@/components/agent-card';
@@ -241,7 +242,10 @@ export default function Home() {
       <header className="sticky top-0 z-50 border-b-2 border-foreground bg-background">
         <div className="container flex h-14 items-center justify-between px-4">
           <div className="flex items-center gap-6">
-            <h1 className="terminal-header text-base">SANTA'S MARKET</h1>
+            <div className="flex items-center gap-2">
+              <Image src="/logo.png" alt="Santa's Market" width={32} height={32} />
+              <h1 className="terminal-header text-base">SANTA'S MARKET</h1>
+            </div>
             <nav className="hidden md:flex items-center gap-4">
               <span className="terminal-header text-primary">LIVE</span>
               <span className="text-muted-foreground">|</span>
@@ -277,7 +281,7 @@ export default function Home() {
               <div className="flex-1 h-2 bg-muted border border-foreground max-w-md">
                 <div
                   className="h-full bg-secondary transition-all duration-1000"
-                  style={{ width: `${Math.max(0, 100 - (countdown / 180) * 100)}%` }}
+                  style={{ width: `${Math.max(0, 100 - (countdown / 600) * 100)}%` }}
                 />
               </div>
               <span className="font-mono text-sm font-bold text-secondary min-w-[3rem]">

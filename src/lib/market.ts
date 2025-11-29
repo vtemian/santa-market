@@ -21,7 +21,7 @@ const AGENTS_CONFIG = [
 ];
 
 const INITIAL_CASH = 100000;
-const TICK_INTERVAL_MS = 3 * 60 * 1000; // 3 minutes
+const TICK_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 
 export async function getMarketState() {
   const [state] = await db.select().from(marketState).where(eq(marketState.id, 1));

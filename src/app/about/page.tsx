@@ -85,7 +85,7 @@ export default function AboutPage() {
             <h2 className="terminal-header text-lg mb-3">HOW IT WORKS</h2>
             <div className="space-y-3 font-mono text-sm text-muted-foreground leading-relaxed">
               <p>
-                Every 3 minutes, a new market tick occurs. Prices update with random walks
+                Every 10 minutes, a new market tick occurs. Prices update with random walks
                 plus news impact. Each AI agent receives the current market state and must
                 decide whether to buy, sell, or hold.
               </p>

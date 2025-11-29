@@ -84,7 +84,7 @@ function buildAnalysisPrompt(agent: AgentConfig, state: TurnState): string {
   return `
 === NORTH POLE STOCK EXCHANGE - TICK #${state.day} ===
 
-IMPORTANT: This is a LIVE CONTINUOUS MARKET. Ticks occur every 3 minutes, NOT daily.
+IMPORTANT: This is a LIVE CONTINUOUS MARKET. Ticks occur every 10 minutes, NOT daily.
 Multiple ticks happen per real-world hour. Plan your strategy accordingly - you can
 trade frequently, but transaction costs add up. The market follows real calendar dates
 for seasonal phases (Christmas approaches in real-time).
