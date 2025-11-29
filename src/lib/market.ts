@@ -137,17 +137,16 @@ export async function advanceMarket(): Promise<{ news: any; prices: Record<strin
     // Base random walk: ±5% per tick (more volatile)
     const randomChange = (random() - 0.5) * 10; // -5% to +5%
 
-    // Add momentum: if price moved away from initial, slight tendency to continue
+    // Mean reversion: pull prices back toward initial value
+    // Stronger the further away from initial price
     const priceRatio = price / initialPrice;
-    const momentum = priceRatio > 1.1 ? 0.5 : priceRatio < 0.9 ? -0.5 : 0;
-
-    // Add mean reversion at extremes
-    const meanReversion = priceRatio > 1.5 ? -1 : priceRatio < 0.6 ? 1 : 0;
+    const deviation = priceRatio - 1.0; // how far from initial (e.g., 0.3 = 30% above)
+    const meanReversion = -deviation * 2; // pull back 2% per 1% deviation
 
     // Occasional volatility spike (10% chance of 2x volatility)
     const volatilitySpike = random() < 0.1 ? 2 : 1;
 
-    const totalChange = (randomChange + momentum + meanReversion) * volatilitySpike;
+    const totalChange = (randomChange + meanReversion) * volatilitySpike;
     price = price * (1 + totalChange / 100);
 
     // Apply news impact if applicable
