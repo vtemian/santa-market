@@ -112,6 +112,9 @@ ${holdingsText || '- No holdings'}
 NEWS THIS TICK:
 ${state.events.length > 0 ? state.events.map(e => e.message).join('\n\n') : 'No breaking news.'}
 
+YOUR RECENT TRADES (last 5 ticks):
+${formatTradeHistory(state.tradeHistory)}
+
 TRADING RULES:
 - Max position: ${(state.constraints.maxPositionPct * 100).toFixed(0)}% of portfolio in any single stock
 - Max COAL: ${(state.constraints.maxCoalPct * 100).toFixed(0)}% (risky contrarian play)
@@ -160,6 +163,42 @@ function formatPriceHistory(priceHistory: Record<string, number[]>): string {
     const recent = history.slice(-maxDays);
     const formatted = recent.map(p => `$${p.toFixed(2)}`).join(', ');
     lines.push(`- ${ticker}: ${formatted}`);
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Format trade history for agent memory
+ */
+function formatTradeHistory(tradeHistory?: Array<{
+  tick: number;
+  orders: Array<{ ticker: string; action: string; quantity: number; price: number }>;
+  reasoning: string;
+}>): string {
+  if (!tradeHistory || tradeHistory.length === 0) {
+    return 'No previous trades yet.';
+  }
+
+  const lines: string[] = [];
+  for (const entry of tradeHistory) {
+    if (entry.orders.length === 0) {
+      lines.push(`- Tick #${entry.tick}: No trades`);
+      if (entry.reasoning && !entry.reasoning.startsWith('Error')) {
+        // Truncate reasoning to first 150 chars for brevity
+        const shortReasoning = entry.reasoning.slice(0, 150).replace(/\n/g, ' ');
+        lines.push(`  Reasoning: "${shortReasoning}${entry.reasoning.length > 150 ? '...' : ''}"`);
+      }
+    } else {
+      const orderStrings = entry.orders.map(o =>
+        `${o.action} ${o.quantity} ${o.ticker} @ $${o.price.toFixed(2)}`
+      ).join(', ');
+      lines.push(`- Tick #${entry.tick}: ${orderStrings}`);
+      if (entry.reasoning && !entry.reasoning.startsWith('Error')) {
+        const shortReasoning = entry.reasoning.slice(0, 150).replace(/\n/g, ' ');
+        lines.push(`  Reasoning: "${shortReasoning}${entry.reasoning.length > 150 ? '...' : ''}"`);
+      }
+    }
   }
 
   return lines.join('\n');

@@ -40,6 +40,14 @@ export async function getRecentTrades(tickNumber: number) {
   return db.select().from(trades).where(eq(trades.tickNumber, tickNumber));
 }
 
+export async function getRecentTradesForAgent(agentId: string, limit = 5) {
+  return db.select()
+    .from(trades)
+    .where(eq(trades.agentId, agentId))
+    .orderBy(desc(trades.tickNumber))
+    .limit(limit);
+}
+
 export async function initializeMarket() {
   const existing = await getMarketState();
   if (existing) return existing;

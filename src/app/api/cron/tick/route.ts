@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { advanceMarket, getMarketState, getAgents, updateAgentPortfolio, recordTrade, applyTradePressure, saveAgentSnapshots } from '@/lib/market';
+import { advanceMarket, getMarketState, getAgents, updateAgentPortfolio, recordTrade, applyTradePressure, saveAgentSnapshots, getRecentTradesForAgent } from '@/lib/market';
 import { callModelTwoPhase, MODEL_IDS } from '@/sim/ai-gateway';
 
 const AGENTS_CONFIG = [
@@ -36,6 +36,14 @@ export async function GET(request: NextRequest) {
       const holdings = agentRow.holdings as Record<string, number>;
       const cash = parseFloat(agentRow.cash);
 
+      // Fetch recent trades for this agent (for memory/context)
+      const recentTrades = await getRecentTradesForAgent(config.id, 5);
+      const tradeHistory = recentTrades.map(t => ({
+        tick: t.tickNumber,
+        orders: (t.orders as Array<{ ticker: string; action: string; quantity: number; price: number }>) || [],
+        reasoning: t.reasoning || '',
+      }));
+
       // Build prompt context - map simplified DB schema to full TurnState
       const turnState = {
         day: state.tickNumber,
@@ -66,6 +74,7 @@ export async function GET(request: NextRequest) {
           message: news.message
         }] : [],
         constraints: { maxPositionPct: 0.6, maxCoalPct: 0.2, initialCash: 100000 },
+        tradeHistory,
       };
 
       try {

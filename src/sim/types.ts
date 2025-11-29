@@ -77,6 +77,16 @@ export interface AgentState {
 }
 
 // ─────────────────────────────────────────────────────────────
+// Trade History (for agent memory)
+// ─────────────────────────────────────────────────────────────
+
+export interface TradeHistoryEntry {
+  tick: number;
+  orders: Array<{ ticker: string; action: string; quantity: number; price: number }>;
+  reasoning: string;
+}
+
+// ─────────────────────────────────────────────────────────────
 // Turn State (what the model sees)
 // ─────────────────────────────────────────────────────────────
 
@@ -90,6 +100,7 @@ export interface TurnState {
   regime: RegimeState;
   events: EventDescriptor[];
   constraints: Constraints;
+  tradeHistory?: TradeHistoryEntry[];  // Recent trades for this agent
 }
 
 export interface Constraints {

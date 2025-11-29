@@ -4,5 +4,10 @@
       "path": "/api/cron/tick",
       "schedule": "*/3 * * * *"
     }
-  ]
+  ],
+  "functions": {
+    "src/app/api/cron/tick/route.ts": {
+      "maxDuration": 300
+    }
+  }
 }
