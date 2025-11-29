@@ -1,10 +1,8 @@
-import { generateText } from 'ai';
-import { createOpenAI } from '@ai-sdk/openai';
+import { generateText, createGateway } from 'ai';
 import { AgentConfig, TurnState, Order } from './types';
 
-// AI Gateway client
-const gateway = createOpenAI({
-  baseURL: 'https://ai-gateway.vercel.sh/v1',
+// AI Gateway client - uses built-in gateway provider
+const gateway = createGateway({
   apiKey: process.env.AI_GATEWAY_API_KEY,
 });
 
@@ -15,7 +13,7 @@ export const MODEL_IDS = {
   'gemini-pro': 'google/gemini-2.0-flash',
   'grok': 'xai/grok-2',
   'deepseek': 'deepseek/deepseek-chat',
-  'llama': 'groq/llama-3.1-70b-versatile',
+  // llama not available on AI Gateway
 } as const;
 
 /**

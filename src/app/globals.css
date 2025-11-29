@@ -1,27 +1,161 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@import "tw-animate-css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@plugin "tailwindcss-animate";
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-}
+@custom-variant dark (&:is(.dark *));
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+}
+
+:root {
+  --radius: 0.25rem;
+  /* Clean white background */
+  --background: #ffffff;
+  --foreground: #0a0a0a;
+  /* Cards */
+  --card: #ffffff;
+  --card-foreground: #0a0a0a;
+  --popover: #ffffff;
+  --popover-foreground: #0a0a0a;
+  /* Christmas Red - primary accent */
+  --primary: #b91c1c;
+  --primary-foreground: #ffffff;
+  /* Christmas Green - secondary accent */
+  --secondary: #15803d;
+  --secondary-foreground: #ffffff;
+  /* Muted */
+  --muted: #f5f5f5;
+  --muted-foreground: #737373;
+  /* Accent - subtle green */
+  --accent: #f0fdf4;
+  --accent-foreground: #0a0a0a;
+  /* Destructive */
+  --destructive: #dc2626;
+  /* Borders - dark for terminal look */
+  --border: #171717;
+  --input: #e5e5e5;
+  --ring: #15803d;
+  /* Chart colors */
+  --chart-1: #22c55e;
+  --chart-2: #3b82f6;
+  --chart-3: #a855f7;
+  --chart-4: #f59e0b;
+  --chart-5: #ec4899;
+  /* Sidebar */
+  --sidebar: #fafafa;
+  --sidebar-foreground: #0a0a0a;
+  --sidebar-primary: #b91c1c;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #15803d;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #171717;
+  --sidebar-ring: #15803d;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+    outline-color: color-mix(in srgb, var(--ring) 50%, transparent);
+  }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-mono);
+  }
+}
+
+@layer components {
+  .container {
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    max-width: 1400px;
+  }
+
+  /* Terminal-style text */
+  .terminal-text {
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    letter-spacing: -0.025em;
+  }
+
+  .terminal-header {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* Terminal button */
+  .terminal-button {
+    border: 2px solid var(--foreground);
+    background-color: var(--background);
+    padding: 0.5rem 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    font-weight: 700;
+    transition: background-color 0.15s, color 0.15s;
+  }
+
+  .terminal-button:hover {
+    background-color: var(--foreground);
+    color: var(--background);
+  }
+
+  .terminal-button-active {
+    background-color: var(--foreground);
+    color: var(--background);
+  }
+
+  /* Terminal card */
+  .terminal-card {
+    border: 2px solid var(--foreground);
+    background-color: var(--card);
   }
 }

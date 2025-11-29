@@ -1,10 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { runSimulation, ModelCaller } from '@/sim/runner';
-import { getScenario, getAllScenarios } from '@/sim/scenarios';
-import { AgentConfig, TurnState, Order } from '@/sim/types';
+import { NextRequest } from 'next/server';
+import { runSimulationStreaming, ModelCaller } from '@/sim/runner';
+import { getScenario } from '@/sim/scenarios';
+import { AgentConfig, Order } from '@/sim/types';
 import { callModelTwoPhase, MODEL_IDS } from '@/sim/ai-gateway';
 
-// Agent configurations (will be moved to separate file later)
 const AGENTS: AgentConfig[] = [
   {
     id: 'gpt-4o',
@@ -38,16 +37,12 @@ const AGENTS: AgentConfig[] = [
   },
 ];
 
-// Mock model caller for testing
 const mockModelCaller: ModelCaller = async (agent, state) => {
-  // Simulate some basic trading logic
   const orders: Order[] = [];
 
   if (state.day === 1) {
-    // Initial position: buy some SANTA
     orders.push({ ticker: 'SANTA', action: 'BUY', quantity: 200 });
   } else if (state.day === 7 && state.regime.phase === 'holiday_rush') {
-    // Add to position during holiday rush
     orders.push({ ticker: 'GIFT', action: 'BUY', quantity: 100 });
   }
 
@@ -60,52 +55,54 @@ const mockModelCaller: ModelCaller = async (agent, state) => {
   return { reasoning, orders };
 };
 
-// AI Gateway model caller (calls real models)
 const aiGatewayModelCaller: ModelCaller = async (agent, state) => {
   return callModelTwoPhase(agent, state);
 };
 
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const scenarioId = body.scenarioId || 'calm-q4';
+  const body = await request.json();
+  const scenarioId = body.scenarioId || 'calm-q4';
 
-    const scenario = getScenario(scenarioId);
-    if (!scenario) {
-      return NextResponse.json(
-        { error: `Unknown scenario: ${scenarioId}` },
-        { status: 400 }
-      );
-    }
-
-    // Use AI Gateway if API key is available and USE_MOCK_MODELS is not set
-    const useMock = process.env.USE_MOCK_MODELS === 'true' || !process.env.AI_GATEWAY_API_KEY;
-    const modelCaller = useMock ? mockModelCaller : aiGatewayModelCaller;
-
-    const result = await runSimulation({
-      scenario,
-      agents: AGENTS,
-      totalDays: 14,
-      modelCaller,
+  const scenario = getScenario(scenarioId);
+  if (!scenario) {
+    return new Response(JSON.stringify({ error: `Unknown scenario: ${scenarioId}` }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
     });
-
-    return NextResponse.json(result);
-  } catch (error) {
-    console.error('Simulation error:', error);
-    return NextResponse.json(
-      { error: 'Simulation failed' },
-      { status: 500 }
-    );
   }
-}
 
-export async function GET() {
-  // Return list of available scenarios
-  const scenarios = getAllScenarios().map(s => ({
-    id: s.id,
-    name: s.name,
-    description: s.description,
-  }));
+  const useMock = process.env.USE_MOCK_MODELS === 'true' || !process.env.AI_GATEWAY_API_KEY;
+  const modelCaller = useMock ? mockModelCaller : aiGatewayModelCaller;
 
-  return NextResponse.json({ scenarios });
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        await runSimulationStreaming({
+          scenario,
+          agents: AGENTS,
+          totalDays: 14,
+          modelCaller,
+          onProgress: (progress) => {
+            const data = `data: ${JSON.stringify(progress)}\n\n`;
+            controller.enqueue(encoder.encode(data));
+          },
+        });
+        controller.close();
+      } catch (error) {
+        console.error('Streaming simulation error:', error);
+        const errorData = `data: ${JSON.stringify({ type: 'error', message: 'Simulation failed' })}\n\n`;
+        controller.enqueue(encoder.encode(errorData));
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    },
+  });
 }
