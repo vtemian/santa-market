@@ -2,49 +2,49 @@ import { NextRequest, NextResponse } from 'next/server';
 import { runSimulation, ModelCaller } from '@/sim/runner';
 import { getScenario, getAllScenarios } from '@/sim/scenarios';
 import { AgentConfig, TurnState, Order } from '@/sim/types';
-import { parseAgentOutput } from '@/sim/schemas';
+import { callModelTwoPhase, MODEL_IDS } from '@/sim/ai-gateway';
 
 // Agent configurations (will be moved to separate file later)
 const AGENTS: AgentConfig[] = [
   {
     id: 'gpt-4o',
     name: 'GPT-4o',
-    modelId: 'gpt-4o',
+    modelId: MODEL_IDS['gpt-4o'],
     systemPrompt: 'You are a SantaCorp portfolio manager.',
   },
   {
     id: 'claude-sonnet',
     name: 'Claude Sonnet',
-    modelId: 'claude-3-5-sonnet-20241022',
+    modelId: MODEL_IDS['claude-sonnet'],
     systemPrompt: 'You are a SantaCorp portfolio manager.',
   },
   {
     id: 'gemini-pro',
     name: 'Gemini Pro',
-    modelId: 'gemini-1.5-pro',
+    modelId: MODEL_IDS['gemini-pro'],
     systemPrompt: 'You are a SantaCorp portfolio manager.',
   },
   {
     id: 'grok',
     name: 'Grok',
-    modelId: 'grok-beta',
+    modelId: MODEL_IDS['grok'],
     systemPrompt: 'You are a SantaCorp portfolio manager.',
   },
   {
     id: 'deepseek',
     name: 'Deepseek V3',
-    modelId: 'deepseek-chat',
+    modelId: MODEL_IDS['deepseek'],
     systemPrompt: 'You are a SantaCorp portfolio manager.',
   },
   {
     id: 'llama',
     name: 'Llama 3.1 70B',
-    modelId: 'llama-3.1-70b-versatile',
+    modelId: MODEL_IDS['llama'],
     systemPrompt: 'You are a SantaCorp portfolio manager.',
   },
 ];
 
-// Mock model caller for testing (replace with AI Gateway later)
+// Mock model caller for testing
 const mockModelCaller: ModelCaller = async (agent, state) => {
   // Simulate some basic trading logic
   const orders: Order[] = [];
@@ -66,6 +66,11 @@ const mockModelCaller: ModelCaller = async (agent, state) => {
   return { reasoning, orders };
 };
 
+// AI Gateway model caller (calls real models)
+const aiGatewayModelCaller: ModelCaller = async (agent, state) => {
+  return callModelTwoPhase(agent, state);
+};
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -79,11 +84,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Use AI Gateway if API key is available and USE_MOCK_MODELS is not set
+    const useMock = process.env.USE_MOCK_MODELS === 'true' || !process.env.AI_GATEWAY_API_KEY;
+    const modelCaller = useMock ? mockModelCaller : aiGatewayModelCaller;
+
     const result = await runSimulation({
       scenario,
       agents: AGENTS,
       totalDays: 14,
-      modelCaller: mockModelCaller, // TODO: Replace with real AI Gateway caller
+      modelCaller,
     });
 
     return NextResponse.json(result);
