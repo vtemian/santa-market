@@ -107,7 +107,10 @@ export function EquityChart({
             <ChartTooltip
               content={
                 <ChartTooltipContent
-                  labelFormatter={(value) => `Tick ${value}`}
+                  labelFormatter={(value, payload) => {
+                    const day = payload?.[0]?.payload?.day;
+                    return `Tick ${day ?? value}`;
+                  }}
                   formatter={(value, name) => (
                     <div className="flex items-center justify-between gap-8 font-mono text-xs">
                       <span className="text-muted-foreground">{chartConfig[name as keyof typeof chartConfig]?.label || name}</span>
