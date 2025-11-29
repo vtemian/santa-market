@@ -92,7 +92,7 @@ export default function Home() {
   const getPriceChange = (ticker: string): number => {
     if (!marketData || marketData.priceHistory.length < 2) return 0;
     const current = marketData.prices[ticker];
-    const previous = marketData.priceHistory[1]?.prices[ticker];
+    const previous = marketData.priceHistory[marketData.priceHistory.length - 2]?.prices[ticker];
     if (!previous) return 0;
     return ((current - previous) / previous) * 100;
   };
@@ -191,7 +191,7 @@ export default function Home() {
                 {formatCountdown(countdown)}
               </span>
               <span className="terminal-text text-xs text-muted-foreground uppercase">
-                {marketData.season.replace('_', ' ')}
+                {marketData.season.replace(/_/g, ' ')}
               </span>
             </div>
           </div>
