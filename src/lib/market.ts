@@ -23,6 +23,17 @@ const AGENTS_CONFIG = [
 const INITIAL_CASH = 100000;
 const TICK_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 
+// Shares outstanding per ticker - determines market cap and price impact sensitivity
+// Larger market cap = harder to move price, more stable
+// Smaller market cap = easier to move price, more volatile
+const SHARES_OUTSTANDING: Record<string, number> = {
+  SANTA: 10_000_000,  // Blue chip, hardest to manipulate
+  GIFT:   5_000_000,
+  ELF:    3_000_000,
+  REIN:   2_000_000,
+  COAL:   1_000_000,  // Small cap, most volatile (thematic: risky contrarian play)
+};
+
 export async function getMarketState() {
   const [state] = await db.select().from(marketState).where(eq(marketState.id, 1));
   return state;
@@ -243,15 +254,29 @@ export async function applyTradePressure(
     netVolume[order.ticker] = (netVolume[order.ticker] || 0) + delta;
   }
 
-  // Apply price pressure: 0.5% per 50 net shares (more impactful trading)
-  const PRESSURE_FACTOR = 0.005; // 0.5% per 50 shares
-  const BASE_VOLUME = 50;
+  // Apply price pressure based on trade value relative to market cap
+  // Impact = (trade_value / market_cap) * multiplier
+  // This makes large-cap stocks (SANTA) stable and small-cap (COAL) volatile
+  const IMPACT_MULTIPLIER = 0.5; // 0.5% price move per 1% of market cap traded
+  const MAX_IMPACT = 0.10; // Cap at ±10% per tick to prevent extreme manipulation
 
   const newPrices: Record<string, number> = { ...state.prices };
   for (const ticker of TICKERS) {
     if (netVolume[ticker]) {
-      const pressurePct = (netVolume[ticker] / BASE_VOLUME) * PRESSURE_FACTOR;
-      newPrices[ticker] = newPrices[ticker] * (1 + pressurePct);
+      const price = state.prices[ticker];
+      const sharesOutstanding = SHARES_OUTSTANDING[ticker] || 1_000_000;
+      const marketCap = price * sharesOutstanding;
+
+      // Trade value (can be negative for net selling)
+      const tradeValue = netVolume[ticker] * price;
+
+      // Impact as percentage of market cap, scaled by multiplier
+      let impact = (tradeValue / marketCap) * IMPACT_MULTIPLIER;
+
+      // Cap the impact to prevent extreme swings
+      impact = Math.max(-MAX_IMPACT, Math.min(MAX_IMPACT, impact));
+
+      newPrices[ticker] = newPrices[ticker] * (1 + impact);
       // Clamp to bounds
       newPrices[ticker] = Math.max(1, Math.min(500, newPrices[ticker]));
       newPrices[ticker] = Math.round(newPrices[ticker] * 100) / 100;
