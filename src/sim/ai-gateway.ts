@@ -15,6 +15,9 @@ export const MODEL_IDS = {
   'deepseek': 'deepseek/deepseek-v3',
 } as const;
 
+// Temperature for model calls (0 = deterministic, 1 = creative, 2 = chaotic)
+const TEMPERATURE = 0.7;
+
 /**
  * Calls an AI model through Vercel AI Gateway using a two-phase approach:
  * Phase 1: Free-form analysis and reasoning
@@ -35,6 +38,7 @@ export async function callModelTwoPhase(
         model: gateway(agent.modelId),
         system: agent.systemPrompt,
         prompt: phase1Prompt,
+        temperature: TEMPERATURE,
       }),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('Phase 1 timeout')), timeout)
@@ -51,6 +55,7 @@ export async function callModelTwoPhase(
         model: gateway(agent.modelId),
         system: agent.systemPrompt,
         prompt: phase2Prompt,
+        temperature: TEMPERATURE,
       }),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('Phase 2 timeout')), timeout)
