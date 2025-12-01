@@ -1,6 +1,7 @@
 'use client';
 
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Brush, ReferenceLine } from 'recharts';
+import { useState, useRef, useCallback } from 'react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ReferenceLine } from 'recharts';
 import {
   ChartConfig,
   ChartContainer,
@@ -47,7 +48,11 @@ export function EquityChart({
   selectedDay,
   onDaySelect,
 }: EquityChartProps) {
-  const chartData = timeline.map((snapshot) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  // Zoom state: [startIndex, endIndex] - null means show all
+  const [zoomRange, setZoomRange] = useState<[number, number] | null>(null);
+
+  const fullChartData = timeline.map((snapshot) => {
     const dataPoint: Record<string, number> = { day: snapshot.day };
     snapshot.agentLogs.forEach((log) => {
       dataPoint[log.agentId] = log.equity;
@@ -57,7 +62,49 @@ export function EquityChart({
 
   const agentIds = scores.map((score) => score.agentId);
 
-  // Calculate dynamic Y-axis domain based on actual data
+  // Apply zoom to get visible data
+  const chartData = zoomRange
+    ? fullChartData.slice(zoomRange[0], zoomRange[1] + 1)
+    : fullChartData;
+
+  // Handle mouse wheel zoom
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    const totalPoints = fullChartData.length;
+    if (totalPoints <= 1) return;
+
+    const zoomFactor = 0.1;
+    const direction = e.deltaY > 0 ? 1 : -1; // positive = zoom out, negative = zoom in
+
+    setZoomRange((prev) => {
+      const [start, end] = prev ?? [0, totalPoints - 1];
+      const currentRange = end - start;
+      const center = (start + end) / 2;
+
+      // Calculate new range
+      const rangeChange = Math.max(1, Math.floor(currentRange * zoomFactor)) * direction;
+      let newStart = Math.round(center - (currentRange + rangeChange) / 2);
+      let newEnd = Math.round(center + (currentRange + rangeChange) / 2);
+
+      // Clamp to valid bounds
+      newStart = Math.max(0, newStart);
+      newEnd = Math.min(totalPoints - 1, newEnd);
+
+      // Ensure minimum visible points
+      if (newEnd - newStart < 2) {
+        return prev;
+      }
+
+      // If showing all data, return null
+      if (newStart === 0 && newEnd === totalPoints - 1) {
+        return null;
+      }
+
+      return [newStart, newEnd];
+    });
+  }, [fullChartData.length]);
+
+  // Calculate dynamic Y-axis domain based on visible data
   const allValues = chartData.flatMap((point) =>
     agentIds.map((id) => point[id]).filter((v): v is number => v !== undefined)
   );
@@ -70,12 +117,31 @@ export function EquityChart({
     Math.ceil((maxValue + padding) / 100) * 100,
   ];
 
+  const isZoomed = zoomRange !== null;
+
   return (
     <div className="border-2 border-foreground bg-card">
-      <div className="border-b-2 border-foreground px-4 py-2">
+      <div className="border-b-2 border-foreground px-4 py-2 flex items-center justify-between">
         <span className="terminal-header">PORTFOLIO PERFORMANCE</span>
+        <div className="flex items-center gap-2">
+          {isZoomed && (
+            <button
+              onClick={() => setZoomRange(null)}
+              className="font-mono text-xs px-2 py-1 border border-foreground hover:bg-muted"
+            >
+              RESET ZOOM
+            </button>
+          )}
+          <span className="font-mono text-xs text-muted-foreground">
+            scroll to zoom
+          </span>
+        </div>
       </div>
-      <div className="p-4">
+      <div
+        ref={containerRef}
+        className="p-4"
+        onWheel={handleWheel}
+      >
         <ChartContainer config={chartConfig} className="w-full" style={{ height: '700px' }}>
           <LineChart
             data={chartData}
@@ -121,13 +187,6 @@ export function EquityChart({
               }
             />
             <ChartLegend content={<ChartLegendContent />} />
-            <Brush
-              dataKey="day"
-              height={30}
-              stroke="hsl(var(--muted-foreground))"
-              fill="hsl(var(--muted))"
-              tickFormatter={(value) => `T${value}`}
-            />
             <ReferenceLine
               x={selectedDay}
               stroke="hsl(var(--foreground))"
