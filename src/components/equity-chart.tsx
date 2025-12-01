@@ -1,6 +1,6 @@
 'use client';
 
-import { LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Brush, ReferenceLine } from 'recharts';
 import {
   ChartConfig,
   ChartContainer,
@@ -121,6 +121,19 @@ export function EquityChart({
               }
             />
             <ChartLegend content={<ChartLegendContent />} />
+            <Brush
+              dataKey="day"
+              height={30}
+              stroke="hsl(var(--muted-foreground))"
+              fill="hsl(var(--muted))"
+              tickFormatter={(value) => `T${value}`}
+            />
+            <ReferenceLine
+              x={selectedDay}
+              stroke="hsl(var(--foreground))"
+              strokeWidth={2}
+              strokeDasharray="4 4"
+            />
             {agentIds.map((agentId) => (
               <Line
                 key={agentId}

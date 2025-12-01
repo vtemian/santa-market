@@ -72,6 +72,7 @@ export default function Home() {
     type?: string;
     impact: Record<string, number>;
   } | null>(null);
+  const [selectedTick, setSelectedTick] = useState<number | null>(null);
 
   // Manual tick trigger (for local development)
   const triggerTick = async () => {
@@ -379,15 +380,15 @@ export default function Home() {
               <EquityChart
                 timeline={timeline}
                 scores={scores}
-                selectedDay={timeline.length}
-                onDaySelect={() => {}}
+                selectedDay={selectedTick ?? timeline[timeline.length - 1]?.day ?? 0}
+                onDaySelect={setSelectedTick}
               />
             </div>
             <div className="lg:col-span-2" style={{ minHeight: '400px' }}>
               <ModelThoughts
                 timeline={timeline}
                 scores={scores}
-                selectedDay={timeline.length}
+                selectedDay={selectedTick ?? timeline[timeline.length - 1]?.day ?? 0}
               />
             </div>
           </div>
