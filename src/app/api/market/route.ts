@@ -11,7 +11,7 @@ export async function GET() {
 
     const [agentRows, recentTicks, recentTrades] = await Promise.all([
       getAgents(),
-      getRecentTicks(50),
+      getRecentTicks(1000),
       state ? getRecentTrades(state.tickNumber) : [],
     ]);
 
