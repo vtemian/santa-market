@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ReferenceLine } from 'recharts';
 import {
   ChartConfig,
@@ -67,42 +67,54 @@ export function EquityChart({
     ? fullChartData.slice(zoomRange[0], zoomRange[1] + 1)
     : fullChartData;
 
-  // Handle mouse wheel zoom
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const totalPoints = fullChartData.length;
-    if (totalPoints <= 1) return;
+  // Store data length in ref for use in native event handler
+  const dataLengthRef = useRef(fullChartData.length);
+  dataLengthRef.current = fullChartData.length;
 
-    const zoomFactor = 0.1;
-    const direction = e.deltaY > 0 ? 1 : -1; // positive = zoom out, negative = zoom in
+  // Handle mouse wheel zoom with native event listener to properly prevent scroll
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
 
-    setZoomRange((prev) => {
-      const [start, end] = prev ?? [0, totalPoints - 1];
-      const currentRange = end - start;
-      const center = (start + end) / 2;
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const totalPoints = dataLengthRef.current;
+      if (totalPoints <= 1) return;
 
-      // Calculate new range
-      const rangeChange = Math.max(1, Math.floor(currentRange * zoomFactor)) * direction;
-      let newStart = Math.round(center - (currentRange + rangeChange) / 2);
-      let newEnd = Math.round(center + (currentRange + rangeChange) / 2);
+      const zoomFactor = 0.1;
+      const direction = e.deltaY > 0 ? 1 : -1; // positive = zoom out, negative = zoom in
 
-      // Clamp to valid bounds
-      newStart = Math.max(0, newStart);
-      newEnd = Math.min(totalPoints - 1, newEnd);
+      setZoomRange((prev) => {
+        const [start, end] = prev ?? [0, totalPoints - 1];
+        const currentRange = end - start;
+        const center = (start + end) / 2;
 
-      // Ensure minimum visible points
-      if (newEnd - newStart < 2) {
-        return prev;
-      }
+        // Calculate new range
+        const rangeChange = Math.max(1, Math.floor(currentRange * zoomFactor)) * direction;
+        let newStart = Math.round(center - (currentRange + rangeChange) / 2);
+        let newEnd = Math.round(center + (currentRange + rangeChange) / 2);
 
-      // If showing all data, return null
-      if (newStart === 0 && newEnd === totalPoints - 1) {
-        return null;
-      }
+        // Clamp to valid bounds
+        newStart = Math.max(0, newStart);
+        newEnd = Math.min(totalPoints - 1, newEnd);
 
-      return [newStart, newEnd];
-    });
-  }, [fullChartData.length]);
+        // Ensure minimum visible points
+        if (newEnd - newStart < 2) {
+          return prev;
+        }
+
+        // If showing all data, return null
+        if (newStart === 0 && newEnd === totalPoints - 1) {
+          return null;
+        }
+
+        return [newStart, newEnd];
+      });
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => container.removeEventListener('wheel', handleWheel);
+  }, []);
 
   // Calculate dynamic Y-axis domain based on visible data
   const allValues = chartData.flatMap((point) =>
@@ -140,7 +152,6 @@ export function EquityChart({
       <div
         ref={containerRef}
         className="p-4"
-        onWheel={handleWheel}
       >
         <ChartContainer config={chartConfig} className="w-full" style={{ height: '700px' }}>
           <LineChart
