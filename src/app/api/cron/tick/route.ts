@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { advanceMarket, getMarketState, getAgents, updateAgentPortfolio, recordTrade, applyTradePressure, saveAgentSnapshots, getRecentTradesForAgent, getPriceHistory } from '@/lib/market';
+import { advanceMarket, getMarketState, getAgents, updateAgentPortfolio, recordTrade, applyTradePressure, saveAgentSnapshots, getRecentTradesForAgent, getRecentTrades, getPriceHistory } from '@/lib/market';
 import { callModelTwoPhase, MODEL_IDS } from '@/sim/ai-gateway';
 
 const BASE_SYSTEM_PROMPT = `You are an elite portfolio manager competing on the North Pole Stock Exchange.
@@ -42,7 +42,16 @@ export async function GET(request: NextRequest) {
     const agentRows = await getAgents();
     const priceHistory = await getPriceHistory(7);
 
-    // 3. Call all AI agents in parallel
+    // 3. Get previous tick's trades (competitor actions)
+    const previousTrades = state.tickNumber > 1 ? await getRecentTrades(state.tickNumber - 1) : [];
+    const competitorTradesByAgent: Record<string, { orders: Array<{ ticker: string; action: string; quantity: number }> }> = {};
+    for (const trade of previousTrades) {
+      competitorTradesByAgent[trade.agentId] = {
+        orders: (trade.orders as Array<{ ticker: string; action: string; quantity: number }>) || [],
+      };
+    }
+
+    // 4. Call all AI agents in parallel
     const allExecutedOrders: Array<{ ticker: string; action: string; quantity: number }> = [];
 
     const agentCalls = AGENTS_CONFIG.map(async (config) => {
@@ -91,6 +100,13 @@ export async function GET(request: NextRequest) {
         }] : [],
         constraints: { maxPositionPct: 0.6, maxCoalPct: 0.2, initialCash: 100000 },
         tradeHistory,
+        competitorTrades: Object.entries(competitorTradesByAgent)
+          .filter(([agentId]) => agentId !== config.id) // Exclude self
+          .map(([agentId, data]) => ({
+            agentId,
+            agentName: AGENTS_CONFIG.find(a => a.id === agentId)?.name || agentId,
+            orders: data.orders,
+          })),
       };
 
       try {

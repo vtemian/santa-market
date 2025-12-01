@@ -78,13 +78,110 @@ export async function callModelTwoPhase(
 }
 
 /**
- * Build Phase 1 prompt: Ask model to analyze the market
+ * Shuffle array using Fisher-Yates algorithm
  */
-function buildAnalysisPrompt(agent: AgentConfig, state: TurnState): string {
+function shuffleArray<T>(array: T[]): T[] {
+  const result = [...array];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
+/**
+ * Format competitor trades from last tick
+ */
+function formatCompetitorTrades(competitorTrades?: Array<{
+  agentId: string;
+  agentName: string;
+  orders: Array<{ ticker: string; action: string; quantity: number }>;
+}>): string {
+  if (!competitorTrades || competitorTrades.length === 0) {
+    return 'No competitor data available yet.';
+  }
+
+  // Shuffle competitor order so each agent sees them in different order
+  const shuffled = shuffleArray(competitorTrades);
+
+  const lines: string[] = [];
+  for (const competitor of shuffled) {
+    if (competitor.orders.length === 0) {
+      lines.push(`- ${competitor.agentName}: No trades`);
+    } else {
+      const orderStrings = competitor.orders.map(o =>
+        `${o.action} ${o.quantity} ${o.ticker}`
+      ).join(', ');
+      lines.push(`- ${competitor.agentName}: ${orderStrings}`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Build Phase 1 prompt: Ask model to analyze the market
+ * Information sections are randomized to encourage different analytical approaches
+ */
+function buildAnalysisPrompt(agent: AgentConfig, state: TurnState & { competitorTrades?: Array<{ agentId: string; agentName: string; orders: Array<{ ticker: string; action: string; quantity: number }> }> }): string {
   const holdingsText = Object.entries(state.portfolio.holdings)
     .filter(([_, qty]) => qty > 0)
     .map(([ticker, qty]) => `- ${ticker}: ${qty} shares @ $${state.prices[ticker as keyof typeof state.prices].toFixed(2)} = $${(qty * state.prices[ticker as keyof typeof state.prices]).toFixed(2)}`)
     .join('\n');
+
+  const totalValue = state.portfolio.cash + Object.entries(state.portfolio.holdings).reduce((sum, [t, q]) => sum + q * (state.prices[t as keyof typeof state.prices] || 0), 0);
+
+  // Build information sections that will be randomized
+  const sections = [
+    {
+      id: 'season',
+      content: `CURRENT SEASON: ${state.regime.phase.toUpperCase().replace(/_/g, ' ')}
+- Volatility: ${state.regime.volatilityMultiplier.toFixed(2)}x normal`
+    },
+    {
+      id: 'macro',
+      content: `MACRO CONDITIONS:
+- Consumer Sentiment: ${state.macro.consumerSentiment.toFixed(0)}/100
+- Labor Disruption Risk: ${(state.macro.laborDisruptionRisk * 100).toFixed(0)}%
+- Supply Chain Pressure: ${state.macro.supplyChainPressure.toFixed(0)}/100
+- Energy Cost Index: ${state.macro.energyCostIndex.toFixed(2)}x`
+    },
+    {
+      id: 'prices',
+      content: `CURRENT PRICES:
+${shuffleArray(Object.entries(state.prices)).map(([ticker, price]) => `- ${ticker}: $${price.toFixed(2)}`).join('\n')}`
+    },
+    {
+      id: 'history',
+      content: `PRICE HISTORY (last 7 ticks):
+${formatPriceHistory(state.priceHistory)}`
+    },
+    {
+      id: 'portfolio',
+      content: `YOUR PORTFOLIO:
+- Cash: $${state.portfolio.cash.toFixed(2)}
+${holdingsText || '- No holdings'}
+- Total Value: $${totalValue.toFixed(2)}`
+    },
+    {
+      id: 'news',
+      content: `NEWS THIS TICK:
+${state.events.length > 0 ? state.events.map(e => e.message).join('\n\n') : 'No breaking news.'}`
+    },
+    {
+      id: 'your_trades',
+      content: `YOUR RECENT TRADES (last 5 ticks):
+${formatTradeHistory(state.tradeHistory)}`
+    },
+    {
+      id: 'competitor_trades',
+      content: `COMPETITOR ACTIONS (last tick):
+${formatCompetitorTrades(state.competitorTrades)}`
+    },
+  ];
+
+  // Shuffle sections (except keep header and rules fixed)
+  const shuffledSections = shuffleArray(sections);
 
   return `
 === NORTH POLE STOCK EXCHANGE - TICK #${state.day} ===
@@ -94,31 +191,7 @@ Multiple ticks happen per real-world hour. Plan your strategy accordingly - you 
 trade frequently, but transaction costs add up. The market follows real calendar dates
 for seasonal phases (Christmas approaches in real-time).
 
-CURRENT SEASON: ${state.regime.phase.toUpperCase().replace(/_/g, ' ')}
-- Volatility: ${state.regime.volatilityMultiplier.toFixed(2)}x normal
-
-MACRO CONDITIONS:
-- Consumer Sentiment: ${state.macro.consumerSentiment.toFixed(0)}/100
-- Labor Disruption Risk: ${(state.macro.laborDisruptionRisk * 100).toFixed(0)}%
-- Supply Chain Pressure: ${state.macro.supplyChainPressure.toFixed(0)}/100
-- Energy Cost Index: ${state.macro.energyCostIndex.toFixed(2)}x
-
-CURRENT PRICES:
-${Object.entries(state.prices).map(([ticker, price]) => `- ${ticker}: $${price.toFixed(2)}`).join('\n')}
-
-PRICE HISTORY (last 7 ticks):
-${formatPriceHistory(state.priceHistory)}
-
-YOUR PORTFOLIO:
-- Cash: $${state.portfolio.cash.toFixed(2)}
-${holdingsText || '- No holdings'}
-- Total Value: $${(state.portfolio.cash + Object.entries(state.portfolio.holdings).reduce((sum, [t, q]) => sum + q * (state.prices[t as keyof typeof state.prices] || 0), 0)).toFixed(2)}
-
-NEWS THIS TICK:
-${state.events.length > 0 ? state.events.map(e => e.message).join('\n\n') : 'No breaking news.'}
-
-YOUR RECENT TRADES (last 5 ticks):
-${formatTradeHistory(state.tradeHistory)}
+${shuffledSections.map(s => s.content).join('\n\n')}
 
 TRADING RULES:
 - Max position: ${(state.constraints.maxPositionPct * 100).toFixed(0)}% of portfolio in any single stock
@@ -126,7 +199,7 @@ TRADING RULES:
 - Your trades affect prices! Heavy buying pushes prices up, selling pushes down.
 - You compete against other AI models. They see the same news but may interpret differently.
 
-Analyze the market. Consider: news implications, price momentum, portfolio balance, and what your competitors might do.
+Analyze the market. Consider: news implications, price momentum, portfolio balance, and what your competitors are doing.
 `.trim();
 }
 
